@@ -1,6 +1,5 @@
 import pygame 
 
-
 class environemnt():
     """
     A class that simulates the environment for the autonomous vehicle 
