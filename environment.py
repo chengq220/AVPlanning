@@ -7,6 +7,7 @@ PLAYER = (0, 0, 255) #blue color
 OBSTACLE = (0, 255, 0) #green color
 ENV = (255, 0, 0) #red color
 SCREEN = (0, 0, 0) #black color
+TIME = 1 #unit of time
 
 
 class environemnt():
@@ -25,7 +26,7 @@ class environemnt():
         self.dim = dim
         self.screen = self.initDisplay(dim[0], dim[1])
         self.road = self.__generateRoad()
-        self.vehicles = self.__generateVehicle(numVehicles)
+        self.state, self.control = self.__generateVehicle(numVehicles)
 
     def initDisplay(self, width, height):
         """
@@ -79,32 +80,49 @@ class environemnt():
             numVehicle (int): The number of vehicle to generate
 
         Returns:
-            A dictionary containing information about each vehicle generated
+            Dictionaries containing information about each vehicle generated
         """
-        info = dict()
-        for i in range(numVehicle):
-            radius = 5 * random.randint(3,8)
+        state = dict()
+        control = dict()
+        for i in range(numVehicle+1):
+            #generate the player vehicle:
+            if i == 0:
+                radius = 20
+            else: #Generate the obstacle vehicles
+                radius = 5 * random.randint(3,8)
             maxSize = 50
-            v = random.uniform(1,1.25) * random.uniform(0,1)
+            # velocity, acceleration, angle, angular velocity
+            v = random.uniform(0.5,0.8) * random.uniform(0,1)
             a = 0
             theta = 0
+            w = 0
+            
+            # x,y position
             alpha = random.randint(0,1)
             x = random.randint(0, self.dim[1])
             y = alpha * random.randint(self.road[0] + maxSize, self.road[0] + self.road[1] -maxSize)\
                 + (1-alpha) * random.randint(self.road[0]-self.road[1]+maxSize, self.road[0] - maxSize)
-            curInfo = (x, y, theta, v, a, radius)
-            info[i] = curInfo
-            pygame.draw.circle(self.screen, OBSTACLE, (x,y), radius)
-        return info 
+    
+            curState = (x, y, theta, v, radius)
+            curControl = (w, a)
+            state[i] = curState
+            control[i] = curControl
+            pygame.draw.circle(self.screen, PLAYER if i == 0 else OBSTACLE, (x,y), radius)
+        return state, control 
     
     def __update(self):
         """
         Update the new position of the vehicles
         """
-        for key in self.vehicles.keys():
-            x0,y0,theta,v,a,radius = self.vehicles[key] 
-            x1 = (x0 + v) % self.dim[1] 
-            self.vehicles[key] = (x1,y0, theta, v, a,radius)
+        for key in self.state.keys():
+            # update for the parameters according to formulas for velocity and angular velocity
+            x0,y0,theta0,v0,radius = self.state[key] 
+            a, w = self.control[key]
+            v = v0 + a * TIME
+            theta = theta0 + w * TIME
+            x = (x0 + v * np.cos(theta)) % self.dim[1]
+            y = (y0 + v * np.sin(theta)) % self.dim[1] 
+            self.state[key] = (x,y, theta, v, radius)
 
     def __refreshFrame(self):
         """
@@ -113,9 +131,9 @@ class environemnt():
         self.screen.fill(SCREEN) 
         self.__generateRoad()
         self.__update()
-        for key in self.vehicles.keys():
-            x,y,_,_,_,radius = self.vehicles[key]
-            pygame.draw.circle(self.screen, OBSTACLE, (x,y), radius)
+        for key in self.state.keys():
+            x,y,_,_, radius = self.state[key]
+            pygame.draw.circle(self.screen, PLAYER if key == 0 else OBSTACLE, (x,y), radius)
         pygame.display.update()
 
     def runGame(self):
