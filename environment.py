@@ -1,32 +1,34 @@
 import pygame 
 import numpy as np
 import random
-
+from solver import AVP
 
 PLAYER = (0, 0, 255) #blue color
 OBSTACLE = (0, 255, 0) #green color
 ENV = (255, 0, 0) #red color
 SCREEN = (0, 0, 0) #black color
-TIME = 1 #unit of time
-
 
 class environemnt():
     """
     A class that simulates the environment for the autonomous vehicle 
     """
-    def __init__(self, dim, ourself = None, numVehicles = 1):
+    def __init__(self, dim, timeStep = 1, numVehicles = 1, maxVel = 1):
         """
         Initialize the environment
 
         Args:
-            dim (tuple): The dimension of the screen (width, height)
-            ourself (tuple): The tuple of parameters describing the vehicle we are interested in 
+            dim (int): The dimension of the screen 
+            timeStep (int): The time step for each iteration
             numVehicles (int): The number of vehicles on the road that we have to avoid
+            maxVel (int): The maximum velocity that the vehicle can achieve
         """
         self.dim = dim
+        self.step = timeStep
+        self.maxVel = maxVel
         self.screen = self.initDisplay(dim[0], dim[1])
         self.road = self.__generateRoad()
         self.state, self.control = self.__generateVehicle(numVehicles)
+        self.optimizer = AVP() 
 
     def initDisplay(self, width, height):
         """
@@ -114,15 +116,29 @@ class environemnt():
         """
         Update the new position of the vehicles
         """
+        self.control[0] = self.__optimize()
         for key in self.state.keys():
             # update for the parameters according to formulas for velocity and angular velocity
             x0,y0,theta0,v0,radius = self.state[key] 
             a, w = self.control[key]
-            v = v0 + a * TIME
-            theta = theta0 + w * TIME
-            x = (x0 + v * np.cos(theta)) % self.dim[1]
-            y = (y0 + v * np.sin(theta)) % self.dim[1] 
+            v = v0 + a * self.step
+            theta = theta0 + w * self.step
+            x = (x0 + v * np.cos(theta))
+            y = (y0 + v * np.sin(theta))
+            if(key != 0): #only make the obstacle circle back
+                x = x % self.dim[0]
+                y = y % self.dim[1] 
             self.state[key] = (x,y, theta, v, radius)
+
+    def __optimize(self):
+        """
+        Solves the nonlinear optimization problem to find the best 
+        control vector for a given time stamp
+        """
+        guess = np.array([-1.2, 1.0])
+        solver = self.optimizer
+        sol, _ = solver.solve(guess)
+        self.control[0] = sol
 
     def __refreshFrame(self):
         """
@@ -141,7 +157,7 @@ class environemnt():
         Run the simulation/game
         """
         running = True
-        while running:
+        while running and self.state[0][0] <= self.dim[0]:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False

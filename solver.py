@@ -1,10 +1,20 @@
 import numpy as np
 from cyipopt import Problem
 
-class Rosenbrock(Problem):
-    def __init__(self):
-        n = 2  # Number of variables
-        m = 0  # Number of constraints (no constraints)
+class AVP(Problem):
+    """
+    A nonlinear optimization solver setup to solve the Autonomous Vehicle Planning Problem
+    """
+    def __init__(self, variables, constraints):
+        """
+        Initialize the environment
+
+        Args:
+            variables (int): The number of variables
+            constraints (int): The number of constraints
+        """
+        n = 2
+        m = 0  
         super().__init__(n, m)
 
     def objective(self, x):
