@@ -13,9 +13,9 @@ class AVP(Problem):
             variables (int): The number of variables
             constraints (int): The number of constraints
         """
-        n = 2
-        m = 0  
-        super().__init__(n, m)
+        self.var = variables
+        self.con = constraints 
+        super().__init__(self.var, self.con)
 
     def objective(self, x):
         """Compute the objective function value"""
@@ -29,6 +29,8 @@ class AVP(Problem):
 
     def constraints(self, x):
         """Return constraint function values (empty in this case)"""
+        # the car is within the boundary of the lanes
+
         return np.array([])
 
     def jacobian(self, x):
@@ -47,14 +49,66 @@ class AVP(Problem):
         H[1, 0] = H[0, 1]
         H[1, 1] = obj_factor * 200
         return H[self.hessianstructure()]
+    
+    def __objectiveFunction(x, u, r):
+        """
+        The cost evaluating function
 
-# Initial guess
-x0 = np.array([-1.2, 1.0])
+        Args:
+            x (tuple): information about x
+            u (vector): control vector
+            r (matrix): weight matrix
 
-# Instantiate the problem and solve
-problem = Rosenbrock()
-solver = problem
-sol, info = solver.solve(x0)
+        Returns: 
+            The cost at that specific time step
+        """
+        vel = x[4]
+        
+        #incentive faster speed and penalize sharp changes in the control
+        cost = -0.1 * vel + u.T @ r @ u
+        return cost
+        
+    def __collisionConstraints(x, y):
+        """
+        Check for whether the two object are colliding
+        Res = (x-y)^2 - (x_radius - y_radius)^2
+        1. res > 0 ==> no overlap
+        2. res = 0 ==> objects are touching
+        2. res < 0 ==> objects are overlapping
 
-# Display results
-print("Optimal solution:", sol)
+        Args:
+            x (tuple): information about x, y, radius of x
+            y (tuple): information about x, y, radius of y
+
+        Returns: 
+            Integer indicating whether there is an overlap or not
+        """
+        (x1, x2, _, _, r1) = x
+        (y1, y2, _, _, r2)  = y
+        res = (x1 - y1)**2 + (x2- y2)**2 - (r1 - r2)**2
+        return res
+    
+    def __boundaryConstraints(self, A, B, C):
+        """
+        Uses half space representation for the boundary lines in the form 
+        A^T B + C 
+
+        Args:
+            A (Vector): A normal vector to the boundary lane
+            B (Vector): The X,Y position of the vehicle
+            C (Integer): The offset of the boundary lane
+        """
+        val = np.dot(A, B) + C
+        return val
+
+if __name__ == "__main__":
+    # Initial guess
+    x0 = np.array([-1.2, 1.0])
+
+    # Instantiate the problem and solve
+    problem = AVP(2,3)
+    solver = problem
+    sol, info = solver.solve(x0)
+
+    # Display results
+    print("Optimal solution:", sol)

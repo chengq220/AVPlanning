@@ -28,7 +28,7 @@ class environemnt():
         self.screen = self.initDisplay(dim[0], dim[1])
         self.road = self.__generateRoad()
         self.state, self.control = self.__generateVehicle(numVehicles)
-        self.optimizer = AVP() 
+        # self.optimizer = AVP() 
 
     def initDisplay(self, width, height):
         """
@@ -116,7 +116,7 @@ class environemnt():
         """
         Update the new position of the vehicles
         """
-        self.control[0] = self.__optimize()
+        # self.control[0] = self.__optimize()
         for key in self.state.keys():
             # update for the parameters according to formulas for velocity and angular velocity
             x0,y0,theta0,v0,radius = self.state[key] 
@@ -135,10 +135,11 @@ class environemnt():
         Solves the nonlinear optimization problem to find the best 
         control vector for a given time stamp
         """
-        guess = np.array([-1.2, 1.0])
-        solver = self.optimizer
-        sol, _ = solver.solve(guess)
-        self.control[0] = sol
+        # guess = np.array([-1.2, 1.0])
+        # solver = self.optimizer
+        # sol, _ = solver.solve(guess)
+        # self.control[0] = sol
+        return False
 
     def __refreshFrame(self):
         """
