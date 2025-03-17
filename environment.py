@@ -27,8 +27,8 @@ class environemnt():
         self.maxVel = maxVel
         self.screen = self.initDisplay(dim[0], dim[1])
         self.road = self.__generateRoad()
+        self.numVehicle = numVehicles
         self.state, self.control = self.__generateVehicle(numVehicles)
-        # self.optimizer = AVP() 
 
     def initDisplay(self, width, height):
         """
@@ -84,27 +84,58 @@ class environemnt():
         Returns:
             Dictionaries containing information about each vehicle generated
         """
-        state = dict()
+        # state = dict()
+        # control = dict()
+        # for i in range(numVehicle+1):
+        #     #generate the player vehicle:
+        #     if i == 0:
+        #         radius = 20
+        #     else: #Generate the obstacle vehicles
+        #         radius = 5 * random.randint(3,8)
+        #     maxSize = 50
+        #     # velocity, acceleration, angle, angular velocity
+        #     v = random.uniform(0.5,0.8) * random.uniform(0,1)
+        #     a = 0
+        #     theta = 0
+        #     w = 0
+            
+        #     # x,y position
+        #     alpha = random.randint(0,1)
+        #     x = random.randint(0, self.dim[1])
+        #     y = alpha * random.randint(self.road[0] + maxSize, self.road[0] + self.road[1] -maxSize)\
+        #         + (1-alpha) * random.randint(self.road[0]-self.road[1]+maxSize, self.road[0] - maxSize)
+    
+        #     curState = (x, y, theta, v, radius)
+        #     curControl = (w, a)
+        #     state[i] = curState
+        #     control[i] = curControl
+        #     pygame.draw.circle(self.screen, PLAYER if i == 0 else OBSTACLE, (x,y), radius)
+        # return state, control 
+        ###########################################################################################
+        # Testing Purposes
+        ###########################################################################################
+        state = dict() 
         control = dict()
         for i in range(numVehicle+1):
             #generate the player vehicle:
-            if i == 0:
-                radius = 20
-            else: #Generate the obstacle vehicles
-                radius = 5 * random.randint(3,8)
             maxSize = 50
-            # velocity, acceleration, angle, angular velocity
-            v = random.uniform(0.5,0.8) * random.uniform(0,1)
+            radius = 10
             a = 0
             theta = 0
             w = 0
-            
-            # x,y position
-            alpha = random.randint(0,1)
-            x = random.randint(0, self.dim[1])
-            y = alpha * random.randint(self.road[0] + maxSize, self.road[0] + self.road[1] -maxSize)\
-                + (1-alpha) * random.randint(self.road[0]-self.road[1]+maxSize, self.road[0] - maxSize)
-    
+            if i == 0:
+                radius = 20
+                x = 0
+                y = self.road[0]
+                v = 0.1
+            else: #Generate the obstacle vehicles
+                radius = 20
+                # velocity, acceleration, angle, angular velocity
+                v = 0.05
+                # x,y position
+                x = 125
+                y = self.road[0]
+
             curState = (x, y, theta, v, radius)
             curControl = (w, a)
             state[i] = curState
@@ -116,7 +147,7 @@ class environemnt():
         """
         Update the new position of the vehicles
         """
-        # self.control[0] = self.__optimize()
+        self.control[0] = self.__optimize()
         for key in self.state.keys():
             # update for the parameters according to formulas for velocity and angular velocity
             x0,y0,theta0,v0,radius = self.state[key] 
@@ -135,11 +166,14 @@ class environemnt():
         Solves the nonlinear optimization problem to find the best 
         control vector for a given time stamp
         """
-        # guess = np.array([-1.2, 1.0])
-        # solver = self.optimizer
-        # sol, _ = solver.solve(guess)
-        # self.control[0] = sol
-        return False
+        normal = np.array([[1, 0], [-1, 0]]) # only for horizontal stright lines
+        center, diff = self.road
+        offsets = ((center-diff), (center + diff))
+        mod = AVP(var=len(self.control[0]), con = 3, A = normal, C = offsets, state = self.state, \
+                  control = self.control) 
+        guess = np.array([3, 4, 0, 0.5, 10, 0]) 
+        sol, _ = mod.solve(guess)
+        self.control[0] = sol
 
     def __refreshFrame(self):
         """

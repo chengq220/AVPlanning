@@ -1,114 +1,89 @@
 import numpy as np
-from cyipopt import Problem
+from cyipopt import minimize_ipopt
+import matplotlib.pyplot as plt
 
-class AVP(Problem):
-    """
-    A nonlinear optimization solver setup to solve the Autonomous Vehicle Planning Problem
-    """
-    def __init__(self, variables, constraints):
-        """
-        Initialize the environment
+class AVP():
+    def __init__(self, initial, end, bounds, numStep = 50, timeStep = 1, maxIter = 50):
+        #initial/end ==> form of [x, y, v, theta, w, a]
+        self.initial = initial 
+        self.end = end
+        self.numStep = numStep
+        self.timeStep = timeStep
+        self.maxIter = maxIter
+        self.bounds = bounds * self.numStep
+        self.initial_guess = np.zeros(len(self.initial) * self.numStep)
 
-        Args:
-            variables (int): The number of variables
-            constraints (int): The number of constraints
-        """
-        self.var = variables
-        self.con = constraints 
-        super().__init__(self.var, self.con)
+    def initializeTrajectory(self):
+        # x = [x1, y1, v1, theta1, omega1, a1, ..., xN, yN, vN, thetaN, omegaN, aN]
+        for i in range(self.timeStep):
+            t = i / (self.timeStep - 1)
+            self.initial_guess[6*i : 6*i + 4] = self.initial[0:4] + t * (self.end[0:4] - self.initial[0:4]) 
+            self.initial_guess[6*i + 4 : 6*i + 6] = [self.initial[4], self.initial[5]] 
 
+    # Define the objective function (e.g., minimize control effort)
     def objective(self, x):
-        """Compute the objective function value"""
-        return (1 - x[0])**2 + 100 * (x[1] - x[0]**2)**2
-
-    def gradient(self, x):
-        """Compute the gradient of the objective function"""
-        df_dx0 = -2 * (1 - x[0]) - 400 * x[0] * (x[1] - x[0]**2)
-        df_dx1 = 200 * (x[1] - x[0]**2)
-        return np.array([df_dx0, df_dx1])
-
-    def constraints(self, x):
-        """Return constraint function values (empty in this case)"""
-        # the car is within the boundary of the lanes
-
-        return np.array([])
-
-    def jacobian(self, x):
-        """Return the Jacobian of the constraints (empty in this case)"""
-        return np.array([])
-
-    def hessianstructure(self):
-        """Return the sparsity structure of the Hessian"""
-        return np.tril_indices(2)
-
-    def hessian(self, x, lagrange, obj_factor):
-        """Return the Hessian matrix of the Lagrangian"""
-        H = np.zeros((2, 2))
-        H[0, 0] = obj_factor * (2 - 400 * (x[1] - 3 * x[0]**2))
-        H[0, 1] = obj_factor * (-400 * x[0])
-        H[1, 0] = H[0, 1]
-        H[1, 1] = obj_factor * 200
-        return H[self.hessianstructure()]
+        vel = -0.1 * x[3::6] #extract all the velocity
+        omega = x[4::6]  # Extract all omega values
+        accel = x[5::6]  # Extract all acceleration values
+        return np.sum(vel + omega**2 + accel**2)  # Minimize control effort
     
-    def __objectiveFunction(x, u, r):
-        """
-        The cost evaluating function
-
-        Args:
-            x (tuple): information about x
-            u (vector): control vector
-            r (matrix): weight matrix
-
-        Returns: 
-            The cost at that specific time step
-        """
-        vel = x[4]
+    def constraints(self,x):
+        cons = []
+        # Initial conditions
+        cons.extend(x[0:4] - self.initial[0:4])  # Enforce initial state
         
-        #incentive faster speed and penalize sharp changes in the control
-        cost = -0.1 * vel + u.T @ r @ u
-        return cost
-        
-    def __collisionConstraints(x, y):
-        """
-        Check for whether the two object are colliding
-        Res = (x-y)^2 - (x_radius - y_radius)^2
-        1. res > 0 ==> no overlap
-        2. res = 0 ==> objects are touching
-        2. res < 0 ==> objects are overlapping
+        # Final conditions
+        cons.extend(x[-6:-2] - self.end[0:4])  # Enforce final state
+        for i in range(self.numStep - 1):
+            x1, y1, v1, theta1, omega1, a1 = x[6*i : 6*(i+1)]
+            x2, y2, v2, theta2, omega2, a2 = x[6*(i+1) : 6*(i+2)]
 
-        Args:
-            x (tuple): information about x, y, radius of x
-            y (tuple): information about x, y, radius of y
+            # Kinematics x_{k+1} = x_k + v_k * cos(theta_k) * dt
+            cons.append(x2 - (x1 + v1 * np.cos(theta1) * self.timeStep))
+            cons.append(y2 - (y1 + v1 * np.sin(theta1) * self.timeStep))
+            cons.append(v2 - (v1 + a1 * self.timeStep))
+            cons.append(theta2 - (theta1 + omega1 * self.timeStep))
+        return np.array(cons)
 
-        Returns: 
-            Integer indicating whether there is an overlap or not
-        """
-        (x1, x2, _, _, r1) = x
-        (y1, y2, _, _, r2)  = y
-        res = (x1 - y1)**2 + (x2- y2)**2 - (r1 - r2)**2
-        return res
-    
-    def __boundaryConstraints(self, A, B, C):
-        """
-        Uses half space representation for the boundary lines in the form 
-        A^T B + C 
+    def forward(self):
+        result = minimize_ipopt(
+            self.objective,
+            self.initial_guess,
+            bounds=self.bounds,
+            constraints={'type': 'eq', 'fun': self.constraints},
+            options={'disp': 5, 'max_iter':self.maxIter}
+        )
+        solution = result.x
+        return solution 
 
-        Args:
-            A (Vector): A normal vector to the boundary lane
-            B (Vector): The X,Y position of the vehicle
-            C (Integer): The offset of the boundary lane
-        """
-        val = np.dot(A, B) + C
-        return val
+
+def visualizeSolutionPosition(solution):
+    x_pos = solution[0::6]  # Every 6th element starting from index 0
+    y_pos = solution[1::6]  # Every 6th element starting from index 1
+    vx = solution[2::6]     # Every 6th element starting from index 2
+    vy = solution[3::6]     # Every 6th element starting from index 3
+    ax = solution[4::6]     # Every 6th element starting from index 4
+    ay = solution[5::6]     # Every 6th element starting from index 5
+
+    # Time vector
+    time = np.linspace(0, 1*50, 50)  # T is the total time
+
+    plt.figure(figsize=(8, 6))
+    plt.plot(x_pos, y_pos, '-o', label='Optimized Trajectory')
+    plt.xlabel('X Position')
+    plt.ylabel('Y Position')
+    plt.title('Optimized Path Trajectory')
+    plt.legend()
+    plt.grid()
+    plt.show()
 
 if __name__ == "__main__":
-    # Initial guess
-    x0 = np.array([-1.2, 1.0])
+    #define the bounds and conditions
+    bounds = [(0, None), (0, None),(0, 3),(-np.pi/2, np.pi/2),\
+        (None, None),(None, None)]
+    initial = np.array([0, 0, 0.5, 0, 0, 0])
+    end = np.array([15, 0 , 0.5, 0, 0, 0])
 
-    # Instantiate the problem and solve
-    problem = AVP(2,3)
-    solver = problem
-    sol, info = solver.solve(x0)
-
-    # Display results
-    print("Optimal solution:", sol)
+    model = AVP(initial, end, bounds)
+    sol = model.forward()
+    visualizeSolutionPosition(sol)
