@@ -3,54 +3,90 @@ from cyipopt import minimize_ipopt
 import matplotlib.pyplot as plt
 
 class AVP():
-    def __init__(self, initial, end, bounds, numStep = 50, timeStep = 1, maxIter = 50):
-        #initial/end ==> form of [x, y, v, theta, w, a]
-        self.initial = initial 
-        self.end = end
+    def __init__(self, X, O, bounds, numStep = 50, timeStep = 1, maxIter = 50, screensize = 580):
         self.numStep = numStep
         self.timeStep = timeStep
         self.maxIter = maxIter
         self.bounds = bounds * self.numStep
-        self.initial_guess = np.zeros(len(self.initial) * self.numStep)
+        self.screensize = screensize
 
+        #O is in the form of a dictionary of [x.y,v,theta,w,a]
+        self.obstacles = self.obstacleTrajectory(O)
+
+        #initial/end ==> form of [x, y, v, theta, w, a]
+        self.initial, self.end = X
+        self.initial_guess = self.initializeTrajectory()
+
+    # Predict the trajectories of the desired vehicles base on initial guess
     def initializeTrajectory(self):
+        initial_guess = np.zeros(len(self.initial) * self.numStep)
         # x = [x1, y1, v1, theta1, omega1, a1, ..., xN, yN, vN, thetaN, omegaN, aN]
         for i in range(self.timeStep):
             t = i / (self.timeStep - 1)
-            self.initial_guess[6*i : 6*i + 4] = self.initial[0:4] + t * (self.end[0:4] - self.initial[0:4]) 
-            self.initial_guess[6*i + 4 : 6*i + 6] = [self.initial[4], self.initial[5]] 
+            initial_guess[6*i : 6*i + 4] = self.initial[0:4] + t * (self.end[0:4] - self.initial[0:4]) 
+            initial_guess[6*i + 4 : 6*i + 6] = [self.initial[4], self.initial[5]] 
+        return initial_guess
+
+    # Predict the trajectories of the obstacle vehicles
+    def obstacleTrajectory(self, obstacle):
+        traj = []
+        for idx, feature in obstacle.value():
+            cur = np.zeros(len(self.initial) * self.numStep)
+            for i in range(self.timeStep):
+                t = i / (self.timeStep - 1)
+                # simple kinematic setup
+                newXY = feature[0:2] + t * feature[2] * ([np.cos(feature[3]),np.sin(feature[3])])
+                cur[6*i : 6*i + 2] = (newXY[0]%self.screensize, newXY[1]%self.screensize)
+                cur[6*i + 2 : 6*i + 6] = [feature[2], feature[3], feature[4], feature[5]] 
+            traj.append(cur)
+        return np.array(traj)
 
     # Define the objective function (e.g., minimize control effort)
     def objective(self, x):
         vel = -0.1 * x[3::6] #extract all the velocity
-        omega = x[4::6]  # Extract all omega values
-        accel = x[5::6]  # Extract all acceleration values
-        return np.sum(vel + omega**2 + accel**2)  # Minimize control effort
+        omega = x[4::6] 
+        accel = x[5::6]  
+        return np.sum(vel + 0.1 * omega**2 + 0.5 * accel**2) 
     
-    def constraints(self,x):
+    # Defines the equaltiy constraint for the problem
+    def equality_constraints(self,x):
         cons = []
         # Initial conditions
         cons.extend(x[0:4] - self.initial[0:4])  # Enforce initial state
-        
+
         # Final conditions
         cons.extend(x[-6:-2] - self.end[0:4])  # Enforce final state
         for i in range(self.numStep - 1):
             x1, y1, v1, theta1, omega1, a1 = x[6*i : 6*(i+1)]
-            x2, y2, v2, theta2, omega2, a2 = x[6*(i+1) : 6*(i+2)]
+            x2, y2, v2, theta2, _, _ = x[6*(i+1) : 6*(i+2)]
 
             # Kinematics x_{k+1} = x_k + v_k * cos(theta_k) * dt
+            # Constraint to ensures that the state is consistent with the kinematic model
             cons.append(x2 - (x1 + v1 * np.cos(theta1) * self.timeStep))
             cons.append(y2 - (y1 + v1 * np.sin(theta1) * self.timeStep))
             cons.append(v2 - (v1 + a1 * self.timeStep))
             cons.append(theta2 - (theta1 + omega1 * self.timeStep))
         return np.array(cons)
+    
+    # Defines the inequality constraints for the problems
+    def inequality_constraints(self,x):
+        cons = []
+        
+        # The collision constraint
 
+
+        return np.array(cons)
+
+    # Runs the optimization library to solve the optimization formulation
     def forward(self):
         result = minimize_ipopt(
             self.objective,
             self.initial_guess,
             bounds=self.bounds,
-            constraints={'type': 'eq', 'fun': self.constraints},
+            constraints=[
+                {'type': 'eq', 'fun': self.equality_constraints},  # Equality constraints
+                {'type': 'ineq', 'fun': self.inequality_constraints}  # Inequality constraints
+            ],
             options={'disp': 5, 'max_iter':self.maxIter}
         )
         solution = result.x
