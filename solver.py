@@ -3,26 +3,30 @@ from cyipopt import minimize_ipopt
 import matplotlib.pyplot as plt
 
 class AVP():
-    def __init__(self, X, O, bounds, numStep = 50, timeStep = 1, maxIter = 50, screensize = 580):
+    def __init__(self, X, O, radius, bounds, numStep = 50, timeStep = 1, maxIter = 50, screensize = 580):
         self.numStep = numStep
         self.timeStep = timeStep
         self.maxIter = maxIter
         self.bounds = bounds * self.numStep
         self.screensize = screensize
 
-        #O is in the form of a dictionary of [x.y,v,theta,w,a]
-        self.obstacles = self.obstacleTrajectory(O)
-
+        # The radius of each vehicle (index 0 is the vehicle we are optimizing for)
+        self.radius = radius
+        
         #initial/end ==> form of [x, y, v, theta, w, a]
         self.initial, self.end = X
         self.initial_guess = self.initializeTrajectory()
+
+        # O is in the form of a dictionary of [x.y,v,theta,w,a]
+        self.obstacles = self.obstacleTrajectory(O)
+
 
     # Predict the trajectories of the desired vehicles base on initial guess
     def initializeTrajectory(self):
         initial_guess = np.zeros(len(self.initial) * self.numStep)
         # x = [x1, y1, v1, theta1, omega1, a1, ..., xN, yN, vN, thetaN, omegaN, aN]
-        for i in range(self.timeStep):
-            t = i / (self.timeStep - 1)
+        for i in range(self.numStep):
+            t = i / (self.numStep - 1)
             initial_guess[6*i : 6*i + 4] = self.initial[0:4] + t * (self.end[0:4] - self.initial[0:4]) 
             initial_guess[6*i + 4 : 6*i + 6] = [self.initial[4], self.initial[5]] 
         return initial_guess
@@ -30,15 +34,17 @@ class AVP():
     # Predict the trajectories of the obstacle vehicles
     def obstacleTrajectory(self, obstacle):
         traj = []
-        for idx, feature in obstacle.value():
+        for idx, feature in enumerate(obstacle.values()):
             cur = np.zeros(len(self.initial) * self.numStep)
-            for i in range(self.timeStep):
-                t = i / (self.timeStep - 1)
+            for i in range(self.numStep):
+                t = i / (self.numStep - 1)
                 # simple kinematic setup
-                newXY = feature[0:2] + t * feature[2] * ([np.cos(feature[3]),np.sin(feature[3])])
+                newXY = feature[0:2] + t * feature[2] * (np.array([np.cos(feature[3]),np.sin(feature[3])]))
                 cur[6*i : 6*i + 2] = (newXY[0]%self.screensize, newXY[1]%self.screensize)
                 cur[6*i + 2 : 6*i + 6] = [feature[2], feature[3], feature[4], feature[5]] 
             traj.append(cur)
+        print(traj)
+        exit()
         return np.array(traj)
 
     # Define the objective function (e.g., minimize control effort)
@@ -69,11 +75,17 @@ class AVP():
         return np.array(cons)
     
     # Defines the inequality constraints for the problems
-    def inequality_constraints(self,x):
+    def inequality_constraints(self, x):
         cons = []
         
         # The collision constraint
-
+        for idx in range(self.obstacles.shape[0]):
+            curObstacle = self.obstacles[idx]
+            r1, r2 = self.radius[0], self.radius[idx+1]
+            for k in range(self.numStep):
+                collision = np.dot((x[6*k:6*k+2]-curObstacle[6*k:6*k+2]),\
+                                   (x[6*k:6*k+2]-curObstacle[6*k:6*k+2])) - (r1 - r2) ** 2 
+                cons.append(collision)
 
         return np.array(cons)
 
@@ -93,19 +105,19 @@ class AVP():
         return solution 
 
 
-def visualizeSolutionPosition(solution):
+def visualizeSolutionPosition(solution, obstacles):
     x_pos = solution[0::6]  # Every 6th element starting from index 0
     y_pos = solution[1::6]  # Every 6th element starting from index 1
-    vx = solution[2::6]     # Every 6th element starting from index 2
-    vy = solution[3::6]     # Every 6th element starting from index 3
-    ax = solution[4::6]     # Every 6th element starting from index 4
-    ay = solution[5::6]     # Every 6th element starting from index 5
-
-    # Time vector
-    time = np.linspace(0, 1*50, 50)  # T is the total time
 
     plt.figure(figsize=(8, 6))
     plt.plot(x_pos, y_pos, '-o', label='Optimized Trajectory')
+    
+    # Plot obstacle trajectories
+    for idx in range(obstacles.shape[0]):
+        obs_x = obstacles[idx, 0::6]
+        obs_y = obstacles[idx, 1::6]
+        plt.plot(obs_x, obs_y, '--', label=f'Obstacle {idx+1}')
+    
     plt.xlabel('X Position')
     plt.ylabel('Y Position')
     plt.title('Optimized Path Trajectory')
@@ -117,9 +129,13 @@ if __name__ == "__main__":
     #define the bounds and conditions
     bounds = [(0, None), (0, None),(0, 3),(-np.pi/2, np.pi/2),\
         (None, None),(None, None)]
-    initial = np.array([0, 0, 0.5, 0, 0, 0])
-    end = np.array([15, 0 , 0.5, 0, 0, 0])
+    initial = np.array([0, 0, 1, 0, 0, 0])
+    end = np.array([15, 0 , 1, 0, 0, 0])
+    radius = [10,15]
+    obstacle = dict()
+    for i in range(1):
+        obstacle[i] = np.array([2,0,0.6,0,0,0])
 
-    model = AVP(initial, end, bounds)
+    model = AVP((initial, end), obstacle, radius, bounds)
     sol = model.forward()
-    visualizeSolutionPosition(sol)
+    visualizeSolutionPosition(sol, model.obstacles)
