@@ -34,17 +34,20 @@ class AVP():
     # Predict the trajectories of the obstacle vehicles
     def obstacleTrajectory(self, obstacle):
         traj = []
-        for idx, feature in enumerate(obstacle.values()):
+        for idx, feature in obstacle.items():
             cur = np.zeros(len(self.initial) * self.numStep)
             for i in range(self.numStep):
                 t = i / (self.numStep - 1)
-                # simple kinematic setup
-                newXY = feature[0:2] + t * feature[2] * (np.array([np.cos(feature[3]),np.sin(feature[3])]))
-                cur[6*i : 6*i + 2] = (newXY[0]%self.screensize, newXY[1]%self.screensize)
-                cur[6*i + 2 : 6*i + 6] = [feature[2], feature[3], feature[4], feature[5]] 
+                # Simple kinematic setup for straight horizontal motion
+                if i==0:
+                    newX = feature[0] + t * feature[2] * np.cos(feature[3])
+                    newY = feature[1] + t * feature[2] * np.sin(feature[3]) 
+                else:
+                    newX = cur[6*(i-1)] + t * cur[2] * np.cos(cur[3])
+                    newY = cur[6*(i-1)+1] + t * cur[2] * np.sin(cur[3]) 
+                cur[6*i : 6*i + 2] = [newX, newY]  # Update x and y positions
+                cur[6*i + 2 : 6*i + 6] = [feature[2], feature[3], feature[4], feature[5]]  # Keep other states constant
             traj.append(cur)
-        print(traj)
-        exit()
         return np.array(traj)
 
     # Define the objective function (e.g., minimize control effort)
@@ -77,16 +80,15 @@ class AVP():
     # Defines the inequality constraints for the problems
     def inequality_constraints(self, x):
         cons = []
-        
         # The collision constraint
         for idx in range(self.obstacles.shape[0]):
             curObstacle = self.obstacles[idx]
             r1, r2 = self.radius[0], self.radius[idx+1]
             for k in range(self.numStep):
-                collision = np.dot((x[6*k:6*k+2]-curObstacle[6*k:6*k+2]),\
-                                   (x[6*k:6*k+2]-curObstacle[6*k:6*k+2])) - (r1 - r2) ** 2 
+                distance_sq = np.dot((x[6*k:6*k+2] - curObstacle[6*k:6*k+2]), 
+                                    (x[6*k:6*k+2] - curObstacle[6*k:6*k+2]))
+                collision = distance_sq - (r1 + r2) ** 2
                 cons.append(collision)
-
         return np.array(cons)
 
     # Runs the optimization library to solve the optimization formulation
@@ -130,12 +132,13 @@ if __name__ == "__main__":
     bounds = [(0, None), (0, None),(0, 3),(-np.pi/2, np.pi/2),\
         (None, None),(None, None)]
     initial = np.array([0, 0, 1, 0, 0, 0])
-    end = np.array([15, 0 , 1, 0, 0, 0])
+    end = np.array([15, 0, 1, 0, 0, 0])
     radius = [10,15]
     obstacle = dict()
     for i in range(1):
-        obstacle[i] = np.array([2,0,0.6,0,0,0])
+        obstacle[i] = np.array([1,1,0.6,0,0,0])
 
     model = AVP((initial, end), obstacle, radius, bounds)
     sol = model.forward()
+    print(model.equality_constraints(sol))
     visualizeSolutionPosition(sol, model.obstacles)
