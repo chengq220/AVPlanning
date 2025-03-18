@@ -1,13 +1,12 @@
 from environment import environemnt
-import numpy as np
 
-def startSimulation(dim, numSteps = 50, numVehicles = 1, maxVelocity = 1):
+def startSimulation():
     """
     Starts the simulation
     """
-    env = environemnt([dim, dim], numStep = numSteps,numVehicles=numVehicles, maxVel = maxVelocity)
+    env = environemnt("environment/env1.json")
     env.optimize()
     env.runGame()
 
 if __name__ == "__main__":
-    startSimulation(580, numVehicles= 3, maxVelocity = 20)
+    startSimulation()
