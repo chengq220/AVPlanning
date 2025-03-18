@@ -103,7 +103,7 @@ class environemnt():
         for i in range(numVehicle):
             maxSize = 50
             # velocity, acceleration, angle, angular velocity
-            v = random.uniform(self.maxVel-10,self.maxVel-5) 
+            v = random.uniform(self.maxVel-self.maxVel//2,self.maxVel - 5) 
             a = 0
             theta = 0
             w = 0

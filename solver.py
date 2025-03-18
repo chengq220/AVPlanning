@@ -55,7 +55,7 @@ class AVP():
         vel = -0.1 * x[3::6] #extract all the velocity
         omega = x[4::6] 
         accel = x[5::6]  
-        return np.sum(vel + 0.1 * omega**2 + 0.5 * accel**2) 
+        return np.sum(vel + 0.5 * omega**2 + 0.1 * accel**2) 
     
     # Defines the equaltiy constraint for the problem
     def equality_constraints(self,x):
