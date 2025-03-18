@@ -1,7 +1,7 @@
 import pygame 
 import numpy as np
 import random
-from solver import AVP
+from solver import AVP, visualizeSolutionPosition
 
 PLAYER = (0, 0, 255) #blue color
 OBSTACLE = (0, 255, 0) #green color
@@ -75,11 +75,11 @@ class environemnt():
             Initial and end conditions 
         """
         maxSize = 50
-        # velocity, acceleration, angle, angular velocity
-        v = random.uniform(0.5,0.8) * random.uniform(0,1)
+        v = random.uniform(self.maxVel-5,self.maxVel-1) * random.uniform(0.8,1)
         a = 0
         theta = 0
         w = 0
+        
         # x,y position
         alpha = random.randint(0,1)
         x = random.randint(0, self.dim[1]//8)
@@ -87,7 +87,6 @@ class environemnt():
             + (1-alpha) * random.randint(self.road[0]-self.road[1]+maxSize, self.road[0] - maxSize)
         initial = np.array([x, y, v, theta, w, a])
         end = np.array([self.road[0], y, v, theta, w, a])
-        # pygame.draw.circle(self.screen, PLAYER, (x,y), self.radius)
         return (initial, end)
 
     def __generateObstacle(self, numVehicle):
@@ -104,7 +103,7 @@ class environemnt():
         for i in range(numVehicle):
             maxSize = 50
             # velocity, acceleration, angle, angular velocity
-            v = random.uniform(0.5,0.8) * random.uniform(0,1)
+            v = random.uniform(self.maxVel-10,self.maxVel-5) 
             a = 0
             theta = 0
             w = 0
@@ -114,7 +113,6 @@ class environemnt():
             y = alpha * random.randint(self.road[0] + maxSize, self.road[0] + self.road[1] -maxSize)\
                 + (1-alpha) * random.randint(self.road[0]-self.road[1]+maxSize, self.road[0] - maxSize)
             feature = np.array([x, y, v, theta, w, a])
-            # pygame.draw.circle(self.screen, OBSTACLE, (x,y), self.radius)
             obstacles[i] = feature
         return obstacles
 
@@ -129,8 +127,9 @@ class environemnt():
         sol = model.forward()
         self.sol = (sol[0::6], sol[1::6])
         self.obstacleTrajectory = model.obstacles
+        # visualizeSolutionPosition(sol, model.obstacles)
 
-    def __refreshFrame(self, timstep):
+    def __refreshFrame(self, timestep):
         """
         Refreshes the screen with updated values
         """
@@ -138,7 +137,7 @@ class environemnt():
 
         # Update the desire vehicle
         vx, vy = self.sol
-        pygame.draw.circle(self.screen, PLAYER, (vx[timstep],vy[timstep]), self.radius)
+        pygame.draw.circle(self.screen, PLAYER, (vx[timestep],vy[timestep]), self.radius)
         
         # Draw the road for each frame
         self.__drawDashedLine(ENV, stepsize=10)
@@ -148,8 +147,8 @@ class environemnt():
 
         # Update the obstacles 
         for idx in range(self.obstacleTrajectory.shape[0]):
-            obs_x = self.obstacleTrajectory[idx, 0::6][timstep]
-            obs_y = self.obstacleTrajectory[idx, 1::6][timstep]
+            obs_x = self.obstacleTrajectory[idx, 6*timestep]
+            obs_y = self.obstacleTrajectory[idx, 6*timestep + 1]
             pygame.draw.circle(self.screen, OBSTACLE, (obs_x,obs_y), self.radius)
         
         pygame.display.update()
@@ -167,5 +166,5 @@ class environemnt():
                     running = False
             self.__refreshFrame(timestep)
             timestep = timestep + 1
-            pygame.time.delay(1000)
+            pygame.time.delay(75)
         pygame.quit()

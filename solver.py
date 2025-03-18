@@ -37,14 +37,14 @@ class AVP():
         for idx, feature in obstacle.items():
             cur = np.zeros(len(self.initial) * self.numStep)
             for i in range(self.numStep):
-                t = i / (self.numStep - 1)
+                # t = i / (self.numStep - 1)
                 # Simple kinematic setup for straight horizontal motion
                 if i==0:
-                    newX = feature[0] + t * feature[2] * np.cos(feature[3])
-                    newY = feature[1] + t * feature[2] * np.sin(feature[3]) 
+                    newX = feature[0] +  feature[2] * np.cos(feature[3])
+                    newY = feature[1] +  feature[2] * np.sin(feature[3]) 
                 else:
-                    newX = cur[6*(i-1)] + t * cur[2] * np.cos(cur[3])
-                    newY = cur[6*(i-1)+1] + t * cur[2] * np.sin(cur[3]) 
+                    newX = cur[6*(i-1)] + cur[2] * np.cos(cur[3])
+                    newY = cur[6*(i-1)+1] + cur[2] * np.sin(cur[3]) 
                 cur[6*i : 6*i + 2] = [newX, newY]  # Update x and y positions
                 cur[6*i + 2 : 6*i + 6] = [feature[2], feature[3], feature[4], feature[5]]  # Keep other states constant
             traj.append(cur)

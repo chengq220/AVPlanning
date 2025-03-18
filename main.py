@@ -1,7 +1,7 @@
 from environment import environemnt
 import numpy as np
 
-def startSimulation(dim, numSteps = 50, numVehicles = 1, maxVelocity = 2):
+def startSimulation(dim, numSteps = 50, numVehicles = 1, maxVelocity = 1):
     """
     Starts the simulation
     """
@@ -10,4 +10,4 @@ def startSimulation(dim, numSteps = 50, numVehicles = 1, maxVelocity = 2):
     env.runGame()
 
 if __name__ == "__main__":
-    startSimulation(580, numVehicles= 3)
+    startSimulation(580, numVehicles= 3, maxVelocity = 20)
