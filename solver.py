@@ -133,10 +133,10 @@ if __name__ == "__main__":
         (None, None),(None, None)]
     initial = np.array([0, 0, 1, 0, 0, 0])
     end = np.array([15, 0, 1, 0, 0, 0])
-    radius = [10,15]
+    radius = [2,3]
     obstacle = dict()
     for i in range(1):
-        obstacle[i] = np.array([1,1,0.6,0,0,0])
+        obstacle[i] = np.array([6,3,0.6,0,0,0])
 
     model = AVP((initial, end), obstacle, radius, bounds)
     sol = model.forward()
