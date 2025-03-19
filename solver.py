@@ -14,7 +14,8 @@ class AVP():
         self.radius = radius
         
         #initial/end ==> form of [x, y, v, theta, w, a]
-        self.initial, self.end = X
+        # self.initial, self.end = X
+        self.initial = X
         self.initial_guess = self.initializeTrajectory()
 
         # O is in the form of a dictionary of [x.y,v,theta,w,a]
@@ -26,9 +27,17 @@ class AVP():
         initial_guess = np.zeros(len(self.initial) * self.numStep)
         # x = [x1, y1, v1, theta1, omega1, a1, ..., xN, yN, vN, thetaN, omegaN, aN]
         for i in range(self.numStep):
-            t = i / (self.numStep - 1)
-            initial_guess[6*i : 6*i + 4] = self.initial[0:4] + t * (self.end[0:4] - self.initial[0:4]) 
-            initial_guess[6*i + 4 : 6*i + 6] = [self.initial[4], self.initial[5]] 
+            # t = i / (self.numStep - 1)
+            # initial_guess[6*i : 6*i + 4] = self.initial[0:4] + t * (self.end[0:4] - self.initial[0:4]) 
+            # initial_guess[6*i + 4 : 6*i + 6] = [self.initial[4], self.initial[5]] 
+            if i==0:
+                newX = self.initial[0] +  self.timeStep * self.initial[2] * np.cos(self.initial[3])
+                newY = self.initial[1] +  self.timeStep * self.initial[2] * np.sin(self.initial[3]) 
+            else:
+                newX = initial_guess[6*(i-1)] + self.timeStep * initial_guess[2] * np.cos(initial_guess[3])
+                newY = initial_guess[6*(i-1)+1] + self.timeStep * initial_guess[2] * np.sin(initial_guess[3]) 
+            initial_guess[6*i : 6*i + 2] = [newX, newY]  # Update x and y positions
+            initial_guess[6*i + 2 : 6*i + 6] = [self.initial[2], self.initial[3], self.initial[4], self.initial[5]]  
         return initial_guess
 
     # Predict the trajectories of the obstacle vehicles
@@ -40,11 +49,11 @@ class AVP():
                 # t = i / (self.numStep - 1)
                 # Simple kinematic setup for straight horizontal motion
                 if i==0:
-                    newX = feature[0] +  feature[2] * np.cos(feature[3])
-                    newY = feature[1] +  feature[2] * np.sin(feature[3]) 
+                    newX = feature[0] +  self.timeStep * feature[2] * np.cos(feature[3])
+                    newY = feature[1] +  self.timeStep * feature[2] * np.sin(feature[3]) 
                 else:
-                    newX = cur[6*(i-1)] + cur[2] * np.cos(cur[3])
-                    newY = cur[6*(i-1)+1] + cur[2] * np.sin(cur[3]) 
+                    newX = cur[6*(i-1)] + self.timeStep * cur[2] * np.cos(cur[3])
+                    newY = cur[6*(i-1)+1] + self.timeStep * cur[2] * np.sin(cur[3]) 
                 cur[6*i : 6*i + 2] = [newX, newY]  # Update x and y positions
                 cur[6*i + 2 : 6*i + 6] = [feature[2], feature[3], feature[4], feature[5]]  # Keep other states constant
             traj.append(cur)
@@ -60,11 +69,10 @@ class AVP():
     # Defines the equaltiy constraint for the problem
     def equality_constraints(self,x):
         cons = []
-        # Initial conditions
-        cons.extend(x[0:4] - self.initial[0:4])  # Enforce initial state
 
-        # Final conditions
-        cons.extend(x[-6:-2] - self.end[0:4])  # Enforce final state
+        # Enforce initial state
+        cons.extend(x[0:2] - self.initial[0:2])  
+
         for i in range(self.numStep - 1):
             x1, y1, v1, theta1, omega1, a1 = x[6*i : 6*(i+1)]
             x2, y2, v2, theta2, _, _ = x[6*(i+1) : 6*(i+2)]
@@ -89,6 +97,15 @@ class AVP():
                                     (x[6*k:6*k+2] - curObstacle[6*k:6*k+2]))
                 collision = distance_sq - (r1 + r2) ** 2
                 cons.append(collision)
+
+        # Theta bound (constraint -pi/2 <= theta <= pi/2)
+        theta_n = x[3::6]
+        for idx in range(len(theta_n)):
+            cons.append(theta_n[idx] + np.pi/2)
+            cons.append(np.pi/2 - theta_n[idx])
+
+        # Lane constraint
+        
         return np.array(cons)
 
     # Runs the optimization library to solve the optimization formulation

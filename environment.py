@@ -26,7 +26,8 @@ class environemnt():
         self.radius = data["radius"]
         self.numVehicle = data["num_obstacles"]
         self.road = data["road"]
-        self.vehicle = (np.array(data["vehicle_start"]), np.array(data["vehicle_end"]))
+        # self.vehicle = (np.array(data["vehicle_start"]), np.array(data["vehicle_end"]))
+        self.vehicle = np.array(data["vehicle_start"])
         obs = dict()
         for idx, feature in enumerate(data["obstacles"]):
             obs[idx] = np.array(feature)
@@ -63,8 +64,9 @@ class environemnt():
         Solves the nonlinear optimization problem to find the best control vectors for the trajectory
         """
         radius = [self.radius] * (len(self.obsState.keys()) + 1)
+        #[x, y, v, theta, omega, accel]
         bounds = [(0, self.dim[1]), (self.dim[0]//2 - self.dim[0]//5, self.dim[0]//2 + self.dim[0]//5), \
-                  (0, self.maxVel),(-np.pi/4, np.pi/4),(None, None),(None, None)]
+                  (0, self.maxVel),(None, None),(None, None),(None, None)]
         model = AVP(self.vehicle, self.obsState, radius, bounds, numStep=self.numStep,maxIter=10)
         sol = model.forward()
         self.sol = (sol[0::6], sol[1::6])
