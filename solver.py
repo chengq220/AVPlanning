@@ -13,7 +13,7 @@ class AVP():
         # The radius of each vehicle (index 0 is the vehicle we are optimizing for)
         self.radius = radius
         
-        #initial/end ==> form of [x, y, v, theta, w, a]
+        #initial ==> form of [x, y, v, theta, w, a]
         # self.initial, self.end = X
         self.initial = X
         self.initial_guess = self.initializeTrajectory()
@@ -21,15 +21,11 @@ class AVP():
         # O is in the form of a dictionary of [x.y,v,theta,w,a]
         self.obstacles = self.obstacleTrajectory(O)
 
-
     # Predict the trajectories of the desired vehicles base on initial guess
     def initializeTrajectory(self):
         initial_guess = np.zeros(len(self.initial) * self.numStep)
         # x = [x1, y1, v1, theta1, omega1, a1, ..., xN, yN, vN, thetaN, omegaN, aN]
         for i in range(self.numStep):
-            # t = i / (self.numStep - 1)
-            # initial_guess[6*i : 6*i + 4] = self.initial[0:4] + t * (self.end[0:4] - self.initial[0:4]) 
-            # initial_guess[6*i + 4 : 6*i + 6] = [self.initial[4], self.initial[5]] 
             if i==0:
                 newX = self.initial[0] +  self.timeStep * self.initial[2] * np.cos(self.initial[3])
                 newY = self.initial[1] +  self.timeStep * self.initial[2] * np.sin(self.initial[3]) 
@@ -46,7 +42,6 @@ class AVP():
         for idx, feature in obstacle.items():
             cur = np.zeros(len(self.initial) * self.numStep)
             for i in range(self.numStep):
-                # t = i / (self.numStep - 1)
                 # Simple kinematic setup for straight horizontal motion
                 if i==0:
                     newX = feature[0] +  self.timeStep * feature[2] * np.cos(feature[3])
@@ -98,14 +93,20 @@ class AVP():
                 collision = distance_sq - (r1 + r2) ** 2
                 cons.append(collision)
 
-        # Theta bound (constraint -pi/2 <= theta <= pi/2)
+        # Theta bound (constraint -pi/4 <= theta <= pi/4)
         theta_n = x[3::6]
         for idx in range(len(theta_n)):
-            cons.append(theta_n[idx] + np.pi/2)
-            cons.append(np.pi/2 - theta_n[idx])
+            cons.append(theta_n[idx] + np.pi/4)
+            cons.append(np.pi/4 - theta_n[idx])
 
         # Lane constraint
-        
+
+        # Velocity >= 0 --> should be moving forward at all time
+        # vel = x[2::6]
+        # for v in (vel):
+        #     cons.append()
+
+
         return np.array(cons)
 
     # Runs the optimization library to solve the optimization formulation

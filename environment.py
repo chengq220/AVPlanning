@@ -71,7 +71,6 @@ class environemnt():
         sol = model.forward()
         self.sol = (sol[0::6], sol[1::6])
         self.obstacleTrajectory = model.obstacles
-        # visualizeSolutionPosition(sol, model.obstacles)
 
     def __refreshFrame(self, timestep):
         """
@@ -120,5 +119,5 @@ class environemnt():
             pygame.time.delay(100)
         pygame.quit()
         if save:
-            clip = ImageSequenceClip(frames, fps=30)
+            clip = ImageSequenceClip(frames, fps=15)
             clip.write_videofile("output.mp4", codec="libx264")
