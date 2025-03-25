@@ -4,7 +4,7 @@ def startSimulation():
     """
     Starts the simulation
     """
-    env = environemnt("environment/env1.json")
+    env = environemnt("environment/env3.json")
     env.optimize(maxIter=20)
     env.runGame()
 

@@ -34,12 +34,12 @@ class AVP():
             else:
                 # Propagate state using kinematics
                 prev = initial_guess[6*(i-1):6*i]
-                initial_guess[6*i] = prev[0] + self.timeStep * prev[2] * np.cos(prev[3])
-                initial_guess[6*i+1] = prev[1] + t*(self.screensize - self.initial[1])  # Linear interpolation to y=580
+                initial_guess[6*i] = (prev[0] + self.timeStep * prev[2] * np.cos(prev[3]))%self.screensize
+                initial_guess[6*i+1] = prev[1] + self.timeStep * prev[2] * np.sin(prev[3])%self.screensize
                 initial_guess[6*i+2] = prev[2]  # Keep velocity constant initially
-                initial_guess[6*i+3] = 0.1 * np.sin(t * np.pi)  # Small steering
+                initial_guess[6*i+3] = 0.1 * np.cos(t * np.pi)  # Small steering
                 initial_guess[6*i+4] = 0  # Zero angular velocity
-                initial_guess[6*i+5] = 0  # Zero acceleration
+                initial_guess[6*i+5] = 1.2  # Zero acceleration
         return initial_guess
     
     # Predict the trajectories of the obstacle vehicles
@@ -51,12 +51,14 @@ class AVP():
                 # Simple kinematic setup for straight horizontal motion
                 if i==0:
                     newVel = feature[2] + self.timeStep * feature[5] 
-                    newX = feature[0] +  self.timeStep * newVel * np.cos(feature[3])
+                    newX = feature[0] +  self.timeStep * newVel * np.cos(feature[3]) 
                     newY = feature[1] +  self.timeStep * newVel * np.sin(feature[3]) 
                 else:
                     newVel = cur[6*(i-1) + 2] + self.timeStep * cur[6*(i-1)+ 5] 
                     newX = cur[6*(i-1)] + self.timeStep * cur[2] * np.cos(cur[3])
                     newY = cur[6*(i-1)+1] + self.timeStep * cur[2] * np.sin(cur[3]) 
+                newX = newX % self.screensize
+                newY = newY % self.screensize
                 cur[6*i : 6*i + 2] = [newX, newY]  # Update x and y positions
                 cur[6*i + 2 : 6*i + 6] = [newVel, feature[3], feature[4], feature[5]] 
             traj.append(cur)
@@ -69,17 +71,21 @@ class AVP():
         accel = x[5::6]
         
         # Target velocity components
-        vel_cost = -0.1 * np.sum(velocities**2)
+        vel_cost = -0.2 * np.sum(velocities**2)
         
         # Control effort terms
         omega_cost = 0.5 * np.sum(omega**2)  # Penalize large steering
         accel_cost = 0.1 * np.sum(accel**2)  # Penalize large acceleration
+
+        #change in omega/accel
+        domega = 0.2 * np.sum(np.diff(omega) ** 2)
+        daccel = 0.2 * np.sum(np.diff(accel) ** 2)
         
-        return vel_cost + omega_cost + accel_cost
+        return vel_cost + omega_cost + accel_cost + domega + daccel
     
     # Makes sure that the vehicle remains within the lane
-    def lane_constraint(self, X, a, b, r):
-        return np.dot(a, X[:2] - a*r) - b
+    # def lane_constraint(self, X, a, b, r):
+    #     return np.dot(a, X[:2] - a*r) - b
 
     # Defines the equaltiy constraint for the problem
     def equality_constraints(self,x):
@@ -114,20 +120,20 @@ class AVP():
         # Theta bound (constraint -pi/4 <= theta <= pi/4)
         theta_n = x[3::6]
         for idx in range(len(theta_n)):
-            cons.append(theta_n[idx] + np.pi/4)
-            cons.append(np.pi/4 - theta_n[idx])
+            cons.append(theta_n[idx] + np.pi/6)
+            cons.append(np.pi/6 - theta_n[idx])
 
-        roadCenter, roadWidth = self.road
-        topLane = np.array([0,1])
-        b_top = roadCenter + roadWidth
-        botLane = np.array([0,-1])
-        b_bot = roadCenter - roadWidth
+        # roadCenter, roadWidth = self.road
+        # topLane = np.array([0,1])
+        # b_top = roadCenter + roadWidth
+        # botLane = np.array([0,-1])
+        # b_bot = roadCenter - roadWidth
     
         # Lane constraint
-        for k in range(self.numStep):
-            X = x[6*k:6*k+6]
-            cons.append(self.lane_constraint(X, topLane, b_top, self.radius[0]))
-            cons.append(self.lane_constraint(X, botLane, b_bot, self.radius[0]))
+        # for k in range(self.numStep):
+        #     X = x[6*k:6*k+6]
+        #     cons.append(self.lane_constraint(X, topLane, b_top, self.radius[0]))
+        #     cons.append(self.lane_constraint(X, botLane, b_bot, self.radius[0]))
 
         return np.array(cons)
 
