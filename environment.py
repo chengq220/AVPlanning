@@ -66,7 +66,7 @@ class environemnt():
         radius = [self.radius] * (len(self.obsState.keys()) + 1)
         #[x, y, v, theta, omega, accel]
         bounds = [(None, None), (self.dim[0]//2 - self.dim[0]//5 + self.radius, self.dim[0]//2 + self.dim[0]//5 -self.radius), \
-                  (5, self.maxVel),(np.pi/6, np.pi/6),(0, np.pi/2),(None, None)]
+                  (5, self.maxVel),(None, None),(-1*np.pi/6, np.pi/6),(None, None)]
         model = AVP(self.road, self.vehicle, self.obsState, radius, bounds, numStep=self.numStep, maxIter=maxIter)
         sol = model.forward()
         self.sol = (sol[0::6], sol[1::6])
@@ -98,7 +98,7 @@ class environemnt():
         
         pygame.display.update()
 
-    def runGame(self):
+    def runGame(self, save = "output1.mp4"):
         """
         Run the simulation/game
         """
@@ -120,4 +120,4 @@ class environemnt():
         pygame.quit()
         if save:
             clip = ImageSequenceClip(frames, fps=15)
-            clip.write_videofile("output.mp4", codec="libx264")
+            clip.write_videofile("env1.mp4", codec="libx264")

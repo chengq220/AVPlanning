@@ -3,7 +3,7 @@ from cyipopt import minimize_ipopt
 import matplotlib.pyplot as plt
 
 class AVP():
-    def __init__(self, road, X, O, radius, bounds, numStep = 50, timeStep = 1, maxIter = 50, screensize = 580):
+    def __init__(self, road, X, O, radius, bounds, numStep = 100, timeStep = 0.5, maxIter = 50, screensize = 580):
         # Setting up the environment variable
         self.numStep = numStep
         self.timeStep = timeStep
@@ -50,9 +50,9 @@ class AVP():
             for i in range(self.numStep):
                 # Simple kinematic setup for straight horizontal motion
                 if i==0:
-                    newVel = feature[2] + self.timeStep * feature[5] 
-                    newX = feature[0] +  self.timeStep * newVel * np.cos(feature[3]) 
-                    newY = feature[1] +  self.timeStep * newVel * np.sin(feature[3]) 
+                    newVel = feature[2]
+                    newX = feature[0]
+                    newY = feature[1]
                 else:
                     newVel = cur[6*(i-1) + 2] + self.timeStep * cur[6*(i-1)+ 5] 
                     newX = cur[6*(i-1)] + self.timeStep * cur[2] * np.cos(cur[3])
@@ -67,6 +67,7 @@ class AVP():
     # Define the objective function (e.g., minimize control effort)
     def objective(self, x):
         velocities = x[2::6]
+        theta = x[3::6]
         omega = x[4::6]
         accel = x[5::6]
         
@@ -78,24 +79,20 @@ class AVP():
         accel_cost = 0.1 * np.sum(accel**2)  # Penalize large acceleration
 
         #change in omega/accel
-        domega = 0.2 * np.sum(np.diff(omega) ** 2)
-        daccel = 0.2 * np.sum(np.diff(accel) ** 2)
+        dtheta = 0.5 * np.sum(np.diff(theta) ** 2)
+        daccel = 0.5 * np.sum(np.diff(accel) ** 2)
         
-        return vel_cost + omega_cost + accel_cost + domega + daccel
+        return vel_cost + omega_cost + accel_cost + dtheta + daccel
     
-    # Makes sure that the vehicle remains within the lane
-    # def lane_constraint(self, X, a, b, r):
-    #     return np.dot(a, X[:2] - a*r) - b
-
     # Defines the equaltiy constraint for the problem
     def equality_constraints(self,x):
         cons = []
-        # Enforce initial state/end state
+        # Enforce initial state
         cons.extend(x[0:2] - self.initial[0:2])  
-        cons.append(x[-6] - self.screensize)
         for i in range(self.numStep - 1):
             x1, y1, v1, theta1, omega1, a1 = x[6*i : 6*(i+1)]
             x2, y2, v2, theta2, _, _ = x[6*(i+1) : 6*(i+2)]
+
             # Kinematics x_{k+1} = x_k + v_k * cos(theta_k) * dt
             # Constraint to ensures that the state is consistent with the kinematic model
             cons.append(x2 - (x1 + v1 * np.cos(theta1) * self.timeStep))
@@ -112,23 +109,21 @@ class AVP():
             curObstacle = self.obstacles[idx]
             r1, r2 = self.radius[0], self.radius[idx+1]
             for k in range(self.numStep):
-                distance_sq = np.dot((x[6*k:6*k+2] - curObstacle[6*k:6*k+2]), 
-                                    (x[6*k:6*k+2] - curObstacle[6*k:6*k+2]))
-                collision = distance_sq - (r1 + r2) ** 2
-                cons.append(collision)
+                distance_sq = np.linalg.norm(x[6*k:6*k+2] - curObstacle[6*k:6*k+2]) ** 2
+                cons.append(distance_sq - (r1 + r2) ** 2)
 
         # Theta bound (constraint -pi/4 <= theta <= pi/4)
         theta_n = x[3::6]
         for idx in range(len(theta_n)):
-            cons.append(theta_n[idx] + np.pi/6)
-            cons.append(np.pi/6 - theta_n[idx])
+            cons.append(theta_n[idx] + np.pi/4)
+            cons.append(np.pi/4 - theta_n[idx])
 
         # roadCenter, roadWidth = self.road
         # topLane = np.array([0,1])
         # b_top = roadCenter + roadWidth
         # botLane = np.array([0,-1])
         # b_bot = roadCenter - roadWidth
-    
+
         # Lane constraint
         # for k in range(self.numStep):
         #     X = x[6*k:6*k+6]
@@ -136,6 +131,10 @@ class AVP():
         #     cons.append(self.lane_constraint(X, botLane, b_bot, self.radius[0]))
 
         return np.array(cons)
+
+    # Makes sure that the vehicle remains within the lane
+    # def lane_constraint(self, X, a, b, r):
+    #     return np.dot(a, X[:2] - a*r) - b
 
     # Runs the optimization library to solve the optimization formulation
     def forward(self):
