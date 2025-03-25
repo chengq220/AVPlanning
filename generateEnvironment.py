@@ -69,7 +69,7 @@ if __name__ == "__main__":
     radius = 30
     dim = (580, 580)
     numObs = 3
-    name = "env1"
+    name = "env2"
 
 
     road = calcRoad(dim)

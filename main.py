@@ -5,7 +5,7 @@ def startSimulation():
     Starts the simulation
     """
     env = environemnt("environment/env1.json")
-    env.optimize()
+    env.optimize(maxIter=20)
     env.runGame()
 
 if __name__ == "__main__":

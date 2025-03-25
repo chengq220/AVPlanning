@@ -59,19 +59,19 @@ class environemnt():
                 pygame.draw.line(self.screen, color, (yVal[i],self.dim[1]//2),\
                                   (yVal[i] + stepsize, self.dim[1]//2), 1)
 
-    def optimize(self):
+    def optimize(self, maxIter = 10):
         """
         Solves the nonlinear optimization problem to find the best control vectors for the trajectory
         """
         radius = [self.radius] * (len(self.obsState.keys()) + 1)
         #[x, y, v, theta, omega, accel]
-        bounds = [(0, self.dim[1]), (self.dim[0]//2 - self.dim[0]//5, self.dim[0]//2 + self.dim[0]//5), \
-                  (0, self.maxVel),(None, None),(None, None),(None, None)]
-        model = AVP(self.vehicle, self.obsState, radius, bounds, numStep=self.numStep,maxIter=10)
+        bounds = [(0, self.dim[1]), (self.dim[0]//2 - self.dim[0]//5 + self.radius, self.dim[0]//2 + self.dim[0]//5 -self.radius), \
+                  (5, self.maxVel),(np.pi/4, np.pi/4),(0, np.pi/2),(None, None)]
+        model = AVP(self.road, self.vehicle, self.obsState, radius, bounds, numStep=self.numStep, maxIter=maxIter)
         sol = model.forward()
         self.sol = (sol[0::6], sol[1::6])
         self.obstacleTrajectory = model.obstacles
-
+    
     def __refreshFrame(self, timestep):
         """
         Refreshes the screen with updated values

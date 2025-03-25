@@ -3,39 +3,45 @@ from cyipopt import minimize_ipopt
 import matplotlib.pyplot as plt
 
 class AVP():
-    def __init__(self, X, O, radius, bounds, numStep = 50, timeStep = 1, maxIter = 50, screensize = 580):
+    def __init__(self, road, X, O, radius, bounds, numStep = 50, timeStep = 1, maxIter = 50, screensize = 580):
+        # Setting up the environment variable
         self.numStep = numStep
         self.timeStep = timeStep
         self.maxIter = maxIter
         self.bounds = bounds * self.numStep
         self.screensize = screensize
-
+        self.road = road
+        
         # The radius of each vehicle (index 0 is the vehicle we are optimizing for)
         self.radius = radius
-        
+
         #initial ==> form of [x, y, v, theta, w, a]
-        # self.initial, self.end = X
         self.initial = X
+
         self.initial_guess = self.initializeTrajectory()
 
-        # O is in the form of a dictionary of [x.y,v,theta,w,a]
+        # O is in the form of a dictionary of [x, y,v,theta,w,a]
         self.obstacles = self.obstacleTrajectory(O)
 
     # Predict the trajectories of the desired vehicles base on initial guess
     def initializeTrajectory(self):
         initial_guess = np.zeros(len(self.initial) * self.numStep)
-        # x = [x1, y1, v1, theta1, omega1, a1, ..., xN, yN, vN, thetaN, omegaN, aN]
         for i in range(self.numStep):
-            if i==0:
-                newX = self.initial[0] +  self.timeStep * self.initial[2] * np.cos(self.initial[3])
-                newY = self.initial[1] +  self.timeStep * self.initial[2] * np.sin(self.initial[3]) 
+            t = i / (self.numStep - 1)
+            if i == 0:
+                # Use initial conditions
+                initial_guess[6*i:6*i+6] = self.initial
             else:
-                newX = initial_guess[6*(i-1)] + self.timeStep * initial_guess[2] * np.cos(initial_guess[3])
-                newY = initial_guess[6*(i-1)+1] + self.timeStep * initial_guess[2] * np.sin(initial_guess[3]) 
-            initial_guess[6*i : 6*i + 2] = [newX, newY]  # Update x and y positions
-            initial_guess[6*i + 2 : 6*i + 6] = [self.initial[2], self.initial[3], self.initial[4], self.initial[5]]  
+                # Propagate state using kinematics
+                prev = initial_guess[6*(i-1):6*i]
+                initial_guess[6*i] = prev[0] + self.timeStep * prev[2] * np.cos(prev[3])
+                initial_guess[6*i+1] = prev[1] + t*(self.screensize - self.initial[1])  # Linear interpolation to y=580
+                initial_guess[6*i+2] = prev[2]  # Keep velocity constant initially
+                initial_guess[6*i+3] = 0.1 * np.sin(t * np.pi)  # Small steering
+                initial_guess[6*i+4] = 0  # Zero angular velocity
+                initial_guess[6*i+5] = 0  # Zero acceleration
         return initial_guess
-
+    
     # Predict the trajectories of the obstacle vehicles
     def obstacleTrajectory(self, obstacle):
         traj = []
@@ -44,34 +50,46 @@ class AVP():
             for i in range(self.numStep):
                 # Simple kinematic setup for straight horizontal motion
                 if i==0:
-                    newX = feature[0] +  self.timeStep * feature[2] * np.cos(feature[3])
-                    newY = feature[1] +  self.timeStep * feature[2] * np.sin(feature[3]) 
+                    newVel = feature[2] + self.timeStep * feature[5] 
+                    newX = feature[0] +  self.timeStep * newVel * np.cos(feature[3])
+                    newY = feature[1] +  self.timeStep * newVel * np.sin(feature[3]) 
                 else:
+                    newVel = cur[6*(i-1) + 2] + self.timeStep * cur[6*(i-1)+ 5] 
                     newX = cur[6*(i-1)] + self.timeStep * cur[2] * np.cos(cur[3])
                     newY = cur[6*(i-1)+1] + self.timeStep * cur[2] * np.sin(cur[3]) 
                 cur[6*i : 6*i + 2] = [newX, newY]  # Update x and y positions
-                cur[6*i + 2 : 6*i + 6] = [feature[2], feature[3], feature[4], feature[5]]  # Keep other states constant
+                cur[6*i + 2 : 6*i + 6] = [newVel, feature[3], feature[4], feature[5]] 
             traj.append(cur)
         return np.array(traj)
 
     # Define the objective function (e.g., minimize control effort)
     def objective(self, x):
-        vel = -0.1 * x[3::6] #extract all the velocity
-        omega = x[4::6] 
-        accel = x[5::6]  
-        return np.sum(vel + 0.5 * omega**2 + 0.1 * accel**2) 
+        velocities = x[2::6]
+        omega = x[4::6]
+        accel = x[5::6]
+        
+        # Target velocity components
+        vel_cost = -0.1 * np.sum(velocities**2)
+        
+        # Control effort terms
+        omega_cost = 0.5 * np.sum(omega**2)  # Penalize large steering
+        accel_cost = 0.1 * np.sum(accel**2)  # Penalize large acceleration
+        
+        return vel_cost + omega_cost + accel_cost
     
+    # Makes sure that the vehicle remains within the lane
+    def lane_constraint(self, X, a, b, r):
+        return np.dot(a, X[:2] - a*r) - b
+
     # Defines the equaltiy constraint for the problem
     def equality_constraints(self,x):
         cons = []
-
-        # Enforce initial state
+        # Enforce initial state/end state
         cons.extend(x[0:2] - self.initial[0:2])  
-
+        cons.append(x[-6] - self.screensize)
         for i in range(self.numStep - 1):
             x1, y1, v1, theta1, omega1, a1 = x[6*i : 6*(i+1)]
             x2, y2, v2, theta2, _, _ = x[6*(i+1) : 6*(i+2)]
-
             # Kinematics x_{k+1} = x_k + v_k * cos(theta_k) * dt
             # Constraint to ensures that the state is consistent with the kinematic model
             cons.append(x2 - (x1 + v1 * np.cos(theta1) * self.timeStep))
@@ -99,18 +117,29 @@ class AVP():
             cons.append(theta_n[idx] + np.pi/4)
             cons.append(np.pi/4 - theta_n[idx])
 
+        roadCenter, roadWidth = self.road
+        topLane = np.array([0,1])
+        b_top = roadCenter + roadWidth
+        botLane = np.array([0,-1])
+        b_bot = roadCenter - roadWidth
+    
         # Lane constraint
-
-        # Velocity >= 0 --> should be moving forward at all time
-        # vel = x[2::6]
-        # for v in (vel):
-        #     cons.append()
-
+        for k in range(self.numStep):
+            X = x[6*k:6*k+6]
+            cons.append(self.lane_constraint(X, topLane, b_top, self.radius[0]))
+            cons.append(self.lane_constraint(X, botLane, b_bot, self.radius[0]))
 
         return np.array(cons)
 
     # Runs the optimization library to solve the optimization formulation
     def forward(self):
+        options = {
+            'disp': 5,
+            'max_iter': self.maxIter, 
+            'tol': 1e-6,
+            'constr_viol_tol': 1e-6,
+            'acceptable_tol': 1e-4
+        }
         result = minimize_ipopt(
             self.objective,
             self.initial_guess,
@@ -119,7 +148,7 @@ class AVP():
                 {'type': 'eq', 'fun': self.equality_constraints},  # Equality constraints
                 {'type': 'ineq', 'fun': self.inequality_constraints}  # Inequality constraints
             ],
-            options={'disp': 5, 'max_iter':self.maxIter}
+            options=options
         )
         solution = result.x
         return solution 
@@ -144,19 +173,3 @@ def visualizeSolutionPosition(solution, obstacles):
     plt.legend()
     plt.grid()
     plt.show()
-
-if __name__ == "__main__":
-    #define the bounds and conditions
-    bounds = [(0, None), (0, None),(0, 3),(-np.pi/2, np.pi/2),\
-        (None, None),(None, None)]
-    initial = np.array([0, 0, 1, 0, 0, 0])
-    end = np.array([15, 0, 1, 0, 0, 0])
-    radius = [2,3]
-    obstacle = dict()
-    for i in range(1):
-        obstacle[i] = np.array([6,3,0.6,0,0,0])
-
-    model = AVP((initial, end), obstacle, radius, bounds)
-    sol = model.forward()
-    print(model.equality_constraints(sol))
-    visualizeSolutionPosition(sol, model.obstacles)
