@@ -11,15 +11,11 @@ class AVP():
         self.bounds = bounds * self.numStep
         self.screensize = screensize
         self.road = road
-        
         # The radius of each vehicle (index 0 is the vehicle we are optimizing for)
         self.radius = radius
-
         #initial ==> form of [x, y, v, theta, w, a]
         self.initial = X
-
         self.initial_guess = self.initializeTrajectory()
-
         # O is in the form of a dictionary of [x, y,v,theta,w,a]
         self.obstacles = self.obstacleTrajectory(O)
 
@@ -95,7 +91,6 @@ class AVP():
 
             # Kinematics x_{k+1} = x_k + v_k * cos(theta_k) * dt
             # Constraint to ensures that the state is consistent with the kinematic model
-            cons.append(x2 - (x1 + v1 * np.cos(theta1) * self.timeStep))
             cons.append(y2 - (y1 + v1 * np.sin(theta1) * self.timeStep))
             cons.append(v2 - (v1 + a1 * self.timeStep))
             cons.append(theta2 - (theta1 + omega1 * self.timeStep))
@@ -117,6 +112,10 @@ class AVP():
         for idx in range(len(theta_n)):
             cons.append(theta_n[idx] + np.pi/4)
             cons.append(np.pi/4 - theta_n[idx])
+
+        # diff = np.diff(x[0::6])
+        # for x in range(self.numStep)
+
 
         # roadCenter, roadWidth = self.road
         # topLane = np.array([0,1])
