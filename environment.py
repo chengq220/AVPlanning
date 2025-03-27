@@ -66,7 +66,7 @@ class environemnt():
         radius = [self.radius] * (len(self.obsState.keys()) + 1)
         #[x, y, v, theta, omega, accel]
         bounds = [(None, None), (self.dim[0]//2 - self.dim[0]//5 + self.radius, self.dim[0]//2 + self.dim[0]//5 -self.radius), \
-                  (5, self.maxVel),(None, None),(-1*np.pi/6, np.pi/6),(None, None)]
+                  (5, self.maxVel),(-1*np.pi/4, np.pi/4),(-1*np.pi/6, np.pi/6),(0, 4)]
         model = AVP(self.road, self.vehicle, self.obsState, radius, bounds, numStep=self.numStep, maxIter=maxIter)
         sol = model.forward()
         self.sol = (sol[0::6], sol[1::6])

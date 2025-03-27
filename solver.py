@@ -3,7 +3,8 @@ from cyipopt import minimize_ipopt
 import matplotlib.pyplot as plt
 
 class AVP():
-    def __init__(self, road, X, O, radius, bounds, numStep = 100, timeStep = 0.5, maxIter = 50, screensize = 580):
+    def __init__(self, road, X, O, radius, bounds, numStep = 100, timeStep = 0.5,\
+                 maxIter = 50, screensize = 580):
         # Setting up the environment variable
         self.numStep = numStep
         self.timeStep = timeStep
@@ -62,23 +63,31 @@ class AVP():
 
     # Define the objective function (e.g., minimize control effort)
     def objective(self, x):
+        # _, _, vb, thetab, omegab, accelb = self.bounds[0:6]
         velocities = x[2::6]
         theta = x[3::6]
         omega = x[4::6]
         accel = x[5::6]
         
-        # Target velocity components
-        vel_cost = -0.2 * np.sum(velocities**2)
+        #Target velocity components
+        vel_cost = -0.4 * np.sum(velocities**2)
         
         # Control effort terms
         omega_cost = 0.5 * np.sum(omega**2)  # Penalize large steering
         accel_cost = 0.1 * np.sum(accel**2)  # Penalize large acceleration
 
-        #change in omega/accel
+        # change in omega/accel
         dtheta = 0.5 * np.sum(np.diff(theta) ** 2)
         daccel = 0.5 * np.sum(np.diff(accel) ** 2)
-        
-        return vel_cost + omega_cost + accel_cost + dtheta + daccel
+
+        # penalize the movment away from a straight horizontal line
+        # if possible 
+        dsin =  np.sum(np.sin(theta)**2)
+
+        # Total cost function
+        J = vel_cost + omega_cost + accel_cost + dtheta + daccel + dsin
+        return J
+
     
     # Defines the equaltiy constraint for the problem
     def equality_constraints(self,x):

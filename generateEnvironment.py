@@ -70,6 +70,7 @@ if __name__ == "__main__":
     dim = (580, 580)
     numObs = 3
     name = "env2"
+    numStep = 100
 
 
     road = calcRoad(dim)
@@ -84,7 +85,7 @@ if __name__ == "__main__":
                "vehicle_start": vehicle_start,
                "vehicle_end": vehicle_end,
                "num_obstacles": numObs,
-               "obstacles": obstacles
+               "obstacles": obstacles,
                }
     with open(f"{name}.json", "w") as json_file:
         json.dump(output, json_file, indent=4) 
