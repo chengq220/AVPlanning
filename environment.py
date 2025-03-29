@@ -1,7 +1,7 @@
 import pygame 
 import numpy as np
 import random
-from solver import AVP, visualizeSolutionPosition
+from solver import AVP
 import json
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 
@@ -12,7 +12,7 @@ SCREEN = (0, 0, 0) #black color
 
 class environemnt():
     """
-    A class that simulates the environment for the autonomous vehicle 
+    A class that simulates the environment for the vehicle planning problem 
     """
     def __init__(self, env_file):
         """
@@ -26,7 +26,6 @@ class environemnt():
         self.radius = data["radius"]
         self.numVehicle = data["num_obstacles"]
         self.road = data["road"]
-        # self.vehicle = (np.array(data["vehicle_start"]), np.array(data["vehicle_end"]))
         self.vehicle = np.array(data["vehicle_start"])
         obs = dict()
         for idx, feature in enumerate(data["obstacles"]):
@@ -118,6 +117,6 @@ class environemnt():
             frames.append(frame)
             pygame.time.delay(100)
         pygame.quit()
-        if save:
+        if save: #Save the video to device
             clip = ImageSequenceClip(frames, fps=15)
             clip.write_videofile("env1.mp4", codec="libx264")

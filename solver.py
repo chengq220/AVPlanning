@@ -3,8 +3,14 @@ from cyipopt import minimize_ipopt
 import matplotlib.pyplot as plt
 
 class AVP():
+    """
+    A class that solves that path planning optimization problem
+    """
     def __init__(self, road, X, O, radius, bounds, numStep = 100, timeStep = 0.5,\
                  maxIter = 50, screensize = 580):
+        """
+        Initialize the solver
+        """
         # Setting up the environment variable
         self.numStep = numStep
         self.timeStep = timeStep
@@ -14,14 +20,21 @@ class AVP():
         self.road = road
         # The radius of each vehicle (index 0 is the vehicle we are optimizing for)
         self.radius = radius
+
         #initial ==> form of [x, y, v, theta, w, a]
         self.initial = X
         self.initial_guess = self.initializeTrajectory()
         # O is in the form of a dictionary of [x, y,v,theta,w,a]
         self.obstacles = self.obstacleTrajectory(O)
 
-    # Predict the trajectories of the desired vehicles base on initial guess
     def initializeTrajectory(self):
+        """
+        Predict the trajectories of the desired vehicles base on initial guess
+        Args: 
+            None
+        Returns:
+            The initial guess of the trajectory
+        """
         initial_guess = np.zeros(len(self.initial) * self.numStep)
         for i in range(self.numStep):
             t = i / (self.numStep - 1)
@@ -41,6 +54,13 @@ class AVP():
     
     # Predict the trajectories of the obstacle vehicles
     def obstacleTrajectory(self, obstacle):
+        """
+        Predict the trajectories of the obstacle vehicles base on its static values
+        Args: 
+            obstacle (dict): containing the information about the obstacles
+        Returns:
+            An array containing the trajectories taken by the obstacle vehicles 
+        """
         traj = []
         for idx, feature in obstacle.items():
             cur = np.zeros(len(self.initial) * self.numStep)
@@ -61,8 +81,14 @@ class AVP():
             traj.append(cur)
         return np.array(traj)
 
-    # Define the objective function (e.g., minimize control effort)
     def objective(self, x):
+        """
+        Predict the trajectories of the desired vehicles base on initial guess
+        Args: 
+            x (list): List containing the information about the trajectories 
+        Returns:
+            The cost of the trajectories 
+        """
         # _, _, vb, thetab, omegab, accelb = self.bounds[0:6]
         velocities = x[2::6]
         theta = x[3::6]
@@ -88,9 +114,14 @@ class AVP():
         J = vel_cost + omega_cost + accel_cost + dtheta + daccel + dsin
         return J
 
-    
-    # Defines the equaltiy constraint for the problem
     def equality_constraints(self,x):
+        """
+        Define the equality constraints for the program
+        Args: 
+            x (list): List containing the information about the trajectories 
+        Returns:
+            A list of equality constraints
+        """
         cons = []
         # Enforce initial state
         cons.extend(x[0:2] - self.initial[0:2])  
@@ -105,8 +136,14 @@ class AVP():
             cons.append(theta2 - (theta1 + omega1 * self.timeStep))
         return np.array(cons)
     
-    # Defines the inequality constraints for the problems
     def inequality_constraints(self, x):
+        """
+        Define the inequality constraints for the program
+        Args: 
+            x (list): List containing the information about the trajectories 
+        Returns:
+            A list of inequality constraints
+        """
         cons = []
         # The collision constraint
         for idx in range(self.obstacles.shape[0]):
@@ -122,30 +159,16 @@ class AVP():
             cons.append(theta_n[idx] + np.pi/4)
             cons.append(np.pi/4 - theta_n[idx])
 
-        # diff = np.diff(x[0::6])
-        # for x in range(self.numStep)
-
-
-        # roadCenter, roadWidth = self.road
-        # topLane = np.array([0,1])
-        # b_top = roadCenter + roadWidth
-        # botLane = np.array([0,-1])
-        # b_bot = roadCenter - roadWidth
-
-        # Lane constraint
-        # for k in range(self.numStep):
-        #     X = x[6*k:6*k+6]
-        #     cons.append(self.lane_constraint(X, topLane, b_top, self.radius[0]))
-        #     cons.append(self.lane_constraint(X, botLane, b_bot, self.radius[0]))
-
         return np.array(cons)
 
-    # Makes sure that the vehicle remains within the lane
-    # def lane_constraint(self, X, a, b, r):
-    #     return np.dot(a, X[:2] - a*r) - b
-
-    # Runs the optimization library to solve the optimization formulation
     def forward(self):
+        """
+        Runs the optimization library to solve the optimization formulation
+        Args: 
+            None
+        Returns:
+            The solution the the path planning program
+        """
         options = {
             'disp': 5,
             'max_iter': self.maxIter, 
@@ -153,6 +176,7 @@ class AVP():
             'constr_viol_tol': 1e-6,
             'acceptable_tol': 1e-4
         }
+        # Setup the nonlinear solver
         result = minimize_ipopt(
             self.objective,
             self.initial_guess,
@@ -165,24 +189,3 @@ class AVP():
         )
         solution = result.x
         return solution 
-
-
-def visualizeSolutionPosition(solution, obstacles):
-    x_pos = solution[0::6]  # Every 6th element starting from index 0
-    y_pos = solution[1::6]  # Every 6th element starting from index 1
-
-    plt.figure(figsize=(8, 6))
-    plt.plot(x_pos, y_pos, '-o', label='Optimized Trajectory')
-    
-    # Plot obstacle trajectories
-    for idx in range(obstacles.shape[0]):
-        obs_x = obstacles[idx, 0::6]
-        obs_y = obstacles[idx, 1::6]
-        plt.plot(obs_x, obs_y, '--', label=f'Obstacle {idx+1}')
-    
-    plt.xlabel('X Position')
-    plt.ylabel('Y Position')
-    plt.title('Optimized Path Trajectory')
-    plt.legend()
-    plt.grid()
-    plt.show()
