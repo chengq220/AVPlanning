@@ -8,9 +8,9 @@ conda activate myenv
 ```
 
 ### Generating Environment 
-Run ```generateEnvironment.py``` to generate a new random environment
+Run ```configureEnv.py``` to generate a new random environment
 ```
-python generateEnvironment.py
+python configureEnv.py
 ```
 
 ### Running Simulation
