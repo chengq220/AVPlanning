@@ -1,7 +1,7 @@
 import pygame 
 import numpy as np
 import random
-from solver import AVP
+from source.solver import AVP
 import json
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 
@@ -97,7 +97,7 @@ class environemnt():
         
         pygame.display.update()
 
-    def runGame(self, save = "output1.mp4"):
+    def runGame(self, save = "output1.mp4", saveVid = True):
         """
         Run the simulation/game
         """
@@ -117,6 +117,6 @@ class environemnt():
             frames.append(frame)
             pygame.time.delay(100)
         pygame.quit()
-        if save: #Save the video to device
+        if saveVid: #Save the video to device
             clip = ImageSequenceClip(frames, fps=15)
-            clip.write_videofile("env1.mp4", codec="libx264")
+            clip.write_videofile(save, codec="libx264")

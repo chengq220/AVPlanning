@@ -1,12 +1,12 @@
-from environment import environemnt
+from source.environment import environemnt
 
-def startSimulation():
+def startSimulation(env, save, iter = 10):
     """
     Starts the simulation
     """
-    env = environemnt("environment/env1.json")
-    env.optimize(maxIter=20)
-    env.runGame()
+    env = environemnt(env)
+    env.optimize(maxIter=iter)
+    env.runGame(save=save)
 
 if __name__ == "__main__":
-    startSimulation()
+    startSimulation("environment/env1.json", "output/output.mp4")
