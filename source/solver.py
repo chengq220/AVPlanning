@@ -97,22 +97,22 @@ class AVP():
         accel = x[5::6]
         
         #Target velocity components
-        vel_cost = -0.4 * np.sum(velocities**2)
+        vel_x = velocities * np.cos(theta)
+        vel_x_cost = -0.4 * np.sum(vel_x**2)
+
+        vel_y = velocities * np.sin(theta)
+        vel_y_cost = 0.5 * np.sum(vel_y**2)
         
         # Control effort terms
-        omega_cost = 0.5 * np.sum(omega**2)  # Penalize large steering
+        omega_cost = 0.7 * np.sum(omega**2)  # Penalize large steering
         accel_cost = 0.1 * np.sum(accel**2)  # Penalize large acceleration
 
         # change in omega/accel
         dtheta = 0.5 * np.sum(np.diff(theta) ** 2)
         daccel = 0.5 * np.sum(np.diff(accel) ** 2)
 
-        # penalize the movment away from a straight horizontal line
-        # if possible 
-        dsin =  np.sum(np.sin(theta)**2)
-
         # Total cost function
-        J = vel_cost + omega_cost + accel_cost + dtheta + daccel + dsin
+        J = vel_x_cost + vel_y_cost + omega_cost + accel_cost + dtheta + daccel
         return J
 
     def equality_constraints(self,x):
@@ -154,12 +154,14 @@ class AVP():
                 distance_sq = np.linalg.norm(x[6*k:6*k+2] - curObstacle[6*k:6*k+2]) ** 2
                 # Ensure that each vehicle has some distance between them
                 cons.append(distance_sq - (1 + self.eps)*(r1 + r2) ** 2)
-
-        # Theta bound (constraint -pi/4 <= theta <= pi/4)
-        theta_n = x[3::6]
-        for idx in range(len(theta_n)):
-            cons.append(theta_n[idx] + np.pi/4)
-            cons.append(np.pi/4 - theta_n[idx])
+        
+        yPos = x[1::6]
+        topLaneBound = self.road[0] + self.road[1] - self.radius[0]
+        botLaneBound = self.road[0] - self.road[1] + self.radius[0]
+        # Constraints for the lane
+        for pos in yPos:
+            cons.append(topLaneBound - pos)   
+            cons.append(pos - botLaneBound) 
 
         return np.array(cons)
 
