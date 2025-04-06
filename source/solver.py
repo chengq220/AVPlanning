@@ -6,8 +6,7 @@ class AVP():
     """
     A class that solves that path planning optimization problem
     """
-    def __init__(self, road, X, O, radius, bounds, numStep = 100, timeStep = 0.5,\
-                 maxIter = 50, screensize = 580):
+    def __init__(self, parameters, numStep = 100, timeStep = 0.5, maxIter = 50, screensize = 580):
         """
         Initialize the solver
         """
@@ -15,17 +14,19 @@ class AVP():
         self.numStep = numStep
         self.timeStep = timeStep
         self.maxIter = maxIter
-        self.bounds = bounds * self.numStep
+        self.road = parameters[0]
+        self.bounds = parameters[4] * self.numStep
         self.screensize = screensize
-        self.road = road
+
+        self.eps = parameters[5]
         # The radius of each vehicle (index 0 is the vehicle we are optimizing for)
-        self.radius = radius
+        self.radius = parameters[3]
 
         #initial ==> form of [x, y, v, theta, w, a]
-        self.initial = X
+        self.initial = parameters[1]
         self.initial_guess = self.initializeTrajectory()
-        # O is in the form of a dictionary of [x, y,v,theta,w,a]
-        self.obstacles = self.obstacleTrajectory(O)
+        # O is in the form of a dictionary of [x, y, v, theta, w, a]
+        self.obstacles = self.obstacleTrajectory(parameters[2])
 
     def initializeTrajectory(self):
         """
@@ -129,7 +130,7 @@ class AVP():
             x1, y1, v1, theta1, omega1, a1 = x[6*i : 6*(i+1)]
             x2, y2, v2, theta2, _, _ = x[6*(i+1) : 6*(i+2)]
 
-            # Kinematics x_{k+1} = x_k + v_k * cos(theta_k) * dt
+            # Kinematics y_{k+1} = y_k + v_k * sin(theta_k) * dt
             # Constraint to ensures that the state is consistent with the kinematic model
             cons.append(y2 - (y1 + v1 * np.sin(theta1) * self.timeStep))
             cons.append(v2 - (v1 + a1 * self.timeStep))
@@ -151,7 +152,8 @@ class AVP():
             r1, r2 = self.radius[0], self.radius[idx+1]
             for k in range(self.numStep):
                 distance_sq = np.linalg.norm(x[6*k:6*k+2] - curObstacle[6*k:6*k+2]) ** 2
-                cons.append(distance_sq - (r1 + r2) ** 2)
+                # Ensure that each vehicle has some distance between them
+                cons.append(distance_sq - (1 + self.eps)*(r1 + r2) ** 2)
 
         # Theta bound (constraint -pi/4 <= theta <= pi/4)
         theta_n = x[3::6]

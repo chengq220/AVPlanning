@@ -27,6 +27,7 @@ class environemnt():
         self.numVehicle = data["num_obstacles"]
         self.road = data["road"]
         self.vehicle = np.array(data["vehicle_start"])
+        self.eps = data["eps"]
         obs = dict()
         for idx, feature in enumerate(data["obstacles"]):
             obs[idx] = np.array(feature)
@@ -66,7 +67,8 @@ class environemnt():
         #[x, y, v, theta, omega, accel]
         bounds = [(None, None), (self.dim[0]//2 - self.dim[0]//5 + self.radius, self.dim[0]//2 + self.dim[0]//5 -self.radius), \
                   (5, self.maxVel),(-1*np.pi/4, np.pi/4),(-1*np.pi/6, np.pi/6),(0, 4)]
-        model = AVP(self.road, self.vehicle, self.obsState, radius, bounds, numStep=self.numStep, maxIter=maxIter)
+        parameters = [self.road, self.vehicle, self.obsState, radius, bounds, self.eps]
+        model = AVP(parameters, numStep=self.numStep, maxIter=maxIter)
         sol = model.forward()
         self.sol = (sol[0::6], sol[1::6])
         self.obstacleTrajectory = model.obstacles
@@ -102,7 +104,6 @@ class environemnt():
         Run the simulation/game
         """
         running = True
-        save = True
         timestep = 0
         frames = []
         self.__initDisplay(self.dim[0], self.dim[1])

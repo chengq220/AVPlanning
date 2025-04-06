@@ -64,13 +64,14 @@ def generateObstacle(numVehicle, maxVel, dim, road, radius):
     return obstacles
 
 if __name__ == "__main__":
+    name = "env2"
     numStep = 50
     maxVel = 25
     radius = 30
     dim = (580, 580)
     numObs = 3
-    name = "env2"
     numStep = 100
+    eps = 0.1
 
 
     road = calcRoad(dim)
@@ -81,6 +82,7 @@ if __name__ == "__main__":
               "num_Step": numStep,
               "radius": radius,
                "screenSize": dim,
+               "eps": eps,
                "road": road,
                "vehicle_start": vehicle_start,
                "vehicle_end": vehicle_end,
