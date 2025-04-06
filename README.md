@@ -3,8 +3,8 @@
 ## Get Started
 Run the following command to set up the environment in conda
 ```
-conda create --name myenv --file requirements.txt 
-conda activate myenv
+conda create --name <myenv> --file requirements.txt 
+conda activate <myenv>
 ```
 
 ### Generating Environment 
