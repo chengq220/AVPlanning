@@ -2,7 +2,6 @@ import numpy as np
 import random 
 import json
 
-
 def calcRoad(dim):
     """
     Return information about the boundar and the center
@@ -21,7 +20,7 @@ def generateVehicle(maxVel, dim, road):
     Returns:
         Initial and end conditions 
     """
-    maxSize = 50
+    center, width = road
     v = random.uniform(maxVel-5, maxVel-1) * random.uniform(0.8,1)
     a = 0
     theta = 0
@@ -29,42 +28,44 @@ def generateVehicle(maxVel, dim, road):
     
     # x,y position
     alpha = random.randint(0,1)
-    x = random.randint(0, dim[1]//8)
-    y = alpha * random.randint(road[0] + maxSize, road[0] + road[1] - maxSize)\
-        + (1-alpha) * random.randint(road[0]-road[1]+maxSize, road[0] - maxSize)
+    x = random.randint(1.1 * radius, dim[1]//6)
+    y = center + width//2 - radius if alpha == 0 else center - width//2 + radius
     initial = [x, y, v, theta, w, a]
     end = [road[0], y, v, theta, w, a]
     return (initial, end)
 
-def generateObstacle(numVehicle, maxVel, dim, road, radius):
+def generateObstacle(numVehicle, maxVel, dim, road, radius, vehicle_start):
     """
     Generate the obstacle vehicles on the two side of the road
-
-    Args:
-        numVehicle (int): The number of vehicle to generate
 
     Returns:
         Dictionaries containing information about each vehicle generated
     """
+    center, width = road
     obstacles = []
-    for i in range(numVehicle):
-        maxSize = 50
+    # x coordinate of the target vehicle
+    target_x = vehicle_start[0]
+    
+    for _ in range(numVehicle):
         # velocity, acceleration, angle, angular velocity
         v = random.uniform(maxVel-maxVel//2,maxVel - 5) 
-        a = 0
+        a = random.uniform(1,2) 
         theta = 0
         w = 0
+
         # x,y position
         alpha = random.randint(0,1)
-        x = random.randint(dim[1]//8 + 2*radius, dim[1] - dim[1]//4)
-        y = alpha * random.randint(road[0] + maxSize, road[0] + road[1] -maxSize)\
-            + (1-alpha) * random.randint(road[0]-road[1]+maxSize, road[0] - maxSize)
+        if alpha == 0:
+            x = random.randint(0, target_x-radius)
+        else:
+            x = random.randint(target_x+radius, dim[0])
+        y = center + width//2 - radius if alpha == 0 else center - width//2 + radius
         feature = [x, y, v, theta, w, a]
         obstacles.append(feature)
     return obstacles
 
 if __name__ == "__main__":
-    name = "env2"
+    name = "env4"
     numStep = 50
     maxVel = 25
     radius = 30
@@ -73,10 +74,9 @@ if __name__ == "__main__":
     numStep = 100
     eps = 0.1
 
-
     road = calcRoad(dim)
-    vehicle_start, vehicle_end = generateVehicle(maxVel, dim, road)
-    obstacles = generateObstacle(numObs, maxVel, dim, road, radius)
+    vehicle_start, _ = generateVehicle(maxVel, dim, road)
+    obstacles = generateObstacle(numObs, maxVel, dim, road, radius, vehicle_start)
 
     output = {"max_velocity": maxVel,
               "num_Step": numStep,
@@ -85,9 +85,8 @@ if __name__ == "__main__":
                "eps": eps,
                "road": road,
                "vehicle_start": vehicle_start,
-               "vehicle_end": vehicle_end,
                "num_obstacles": numObs,
                "obstacles": obstacles,
                }
-    with open(f"{name}.json", "w") as json_file:
+    with open(f"environment/{name}.json", "w") as json_file:
         json.dump(output, json_file, indent=4) 

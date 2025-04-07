@@ -9,4 +9,4 @@ def startSimulation(env, save, iter = 10):
     env.runGame(save=save)
 
 if __name__ == "__main__":
-    startSimulation("environment/env1.json", "output/testing.mp4")
+    startSimulation("environment/env4.json", "output/testing.mp4")
