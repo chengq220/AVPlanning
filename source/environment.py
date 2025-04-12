@@ -59,9 +59,22 @@ class environemnt():
                 pygame.draw.line(self.screen, color, (yVal[i],self.dim[1]//2),\
                                   (yVal[i] + stepsize, self.dim[1]//2), 1)
 
-    def optimize(self, maxIter = 10):
+    def load(self, model):
+        """
+        Loads the optimized trajectory (if it exists)
+        Args:
+            model (string) : The directory where model is saved
+        """ 
+        data = np.load(model)
+        self.sol = data['arr1']
+        self.obstacleTrajectory = data['arr2']
+
+    def optimize(self, name, maxIter = 10):
         """
         Solves the nonlinear optimization problem to find the best control vectors for the trajectory
+        Args: 
+            name (string)    : The name of the save location
+            maxIter (integer): The number of iteration for the optimizer 
         """
         radius = [self.radius] * (len(self.obsState.keys()) + 1)
         #[x, y, v, theta, omega, accel]
@@ -72,10 +85,13 @@ class environemnt():
         sol = model.forward()
         self.sol = (sol[0::6], sol[1::6])
         self.obstacleTrajectory = model.obstacles
+        np.savez(name, arr1=self.sol, arr2=self.obstacleTrajectory)
     
     def __refreshFrame(self, timestep):
         """
         Refreshes the screen with updated values
+        Args: 
+            timestep (integer): The timestep for each update
         """
         self.screen.fill(SCREEN) 
 
@@ -106,17 +122,41 @@ class environemnt():
         running = True
         timestep = 0
         frames = []
+        manual = False
         self.__initDisplay(self.dim[0], self.dim[1])
         while running and timestep < self.numStep:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+                elif event.type == pygame.KEYDOWN:
+                    # for manual control of the simulation
+                    if event.key == pygame.K_SPACE:
+                        print("Space bar pressed!")
+                        manual = True
+            
             self.__refreshFrame(timestep)
             timestep = timestep + 1
             frame = pygame.surfarray.array3d(pygame.display.get_surface())
             frame = np.transpose(frame, (1, 0, 2))  # Transpose to match moviepy's format
             frames.append(frame)
-            pygame.time.delay(100)
+            if not manual: 
+                pygame.time.delay(100)
+            else:
+                # wait for user to press next
+                waiting = True
+                while waiting:
+                    for event in pygame.event.get():  # 👈 This fetches new events
+                        if event.type == pygame.QUIT:
+                            running = False
+                            waiting = False
+                        elif event.type == pygame.KEYDOWN:
+                            if event.key == pygame.K_RIGHT:
+                                print("Right arrow key pressed!")
+                                waiting = False
+                            if event.key == pygame.K_SPACE:
+                                print("Space bar pressed!")
+                                manual = False
+                                waiting = False
         pygame.quit()
         if saveVid: #Save the video to device
             clip = ImageSequenceClip(frames, fps=15)
