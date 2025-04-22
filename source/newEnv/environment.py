@@ -1,8 +1,8 @@
 import pygame 
 import numpy as np
 import random
-from source.solver import AVP
-from scipy.interpolate import make_smoothing_spline
+from source.newEnv.solver import AVP
+from scipy.interpolate import make_interp_spline
 import json
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 
@@ -46,6 +46,17 @@ class environemnt():
         self.screen = pygame.display.set_mode((width, height))
 
 
+    def __generate_spline(self):
+        pt = np.array([0, 290, 580])
+        midY = np.array([250, 430, 250])
+    
+        screen_height = self.dim[1]  
+        midY = screen_height - midY  
+        
+        splMid = make_interp_spline(pt, midY, k=2)
+        return splMid
+
+    
     def __drawDashedLine(self, color, stepsize = 20):
         """
         Draw the dashed center line of the road
@@ -54,11 +65,19 @@ class environemnt():
             color (tuple): RGB value of the line
             stepSize (int): the size of the space in the dashed line 
         """
-        yVal = np.arange(0, self.dim[0], stepsize)
-        for i in range(yVal.shape[0]):
-            if i%2 == 0:
-                pygame.draw.line(self.screen, color, (yVal[i],self.dim[1]//2),\
-                                  (yVal[i] + stepsize, self.dim[1]//2), 1)
+        midFunc = self.__generate_spline()
+        current_x = 0
+        
+        while current_x < self.dim[0]:
+            dash_end = current_x + stepsize
+            if dash_end > self.dim[0]:
+                dash_end = self.dim[0]
+            
+            pygame.draw.line(self.screen, color,
+                            (current_x, int(midFunc(current_x))),
+                            (dash_end, int(midFunc(dash_end))),
+                            1)
+            current_x += 2* stepsize
 
     def load(self, model):
         """
@@ -107,10 +126,20 @@ class environemnt():
         # Draw the road for each frame
         self.__drawDashedLine(ENV, stepsize=10)
         roadCenter, roadWidth = self.road
-        pygame.draw.line(self.screen, ENV, (0, (roadCenter-roadWidth)),\
-                          (self.dim[0], (roadCenter-roadWidth)), 1)
-        pygame.draw.line(self.screen, ENV, (0, (roadCenter+roadWidth)), \
-                         (self.dim[0], (roadCenter+roadWidth)), 1)
+        midFunc = self.__generate_spline()
+        x_vals = np.linspace(0, self.dim[0], 100) 
+        top = midFunc(x_vals) + roadWidth
+        bot = midFunc(x_vals) - roadWidth
+        for i in range(len(x_vals)-1):
+            pygame.draw.line(self.screen, ENV, 
+                            (x_vals[i], int(top[i])),
+                            (x_vals[i+1], int(top[i+1])), 
+                            1)
+            
+            pygame.draw.line(self.screen, ENV,
+                            (x_vals[i], int(bot[i])),
+                            (x_vals[i+1], int(bot[i+1])),
+                            1)
 
         # Update the obstacles 
         for idx in range(self.obstacleTrajectory.shape[0]):

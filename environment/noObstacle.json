@@ -1,0 +1,25 @@
+{
+    "max_velocity": 25,
+    "num_Step": 100,
+    "radius": 30,
+    "screenSize": [
+        580,
+        580
+    ],
+    "eps": 0.1,
+    "road": [
+        290,
+        116
+    ],
+    "vehicle_start": [
+        88,
+        262,
+        14.280777757009126,
+        0,
+        0,
+        0
+    ],
+    "num_obstacles": 0,
+    "obstacles": [
+    ]
+}

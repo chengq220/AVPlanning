@@ -21,14 +21,14 @@ def generateVehicle(maxVel, dim, road):
         Initial and end conditions 
     """
     center, width = road
-    v = random.uniform(maxVel-5, maxVel-1) * random.uniform(0.8,1)
+    v = random.uniform(maxVel - 10, maxVel-1) * random.uniform(0.8,1)
     a = 0
     theta = 0
     w = 0
     
     # x,y position
     alpha = random.randint(0,1)
-    x = random.randint(1.1 * radius, dim[1]//6)
+    x = random.randint(2.1 * radius, dim[1]//6)
     y = center + width//2 - radius if alpha == 0 else center - width//2 + radius
     initial = [x, y, v, theta, w, a]
     end = [road[0], y, v, theta, w, a]
@@ -44,7 +44,7 @@ def generateObstacle(numVehicle, maxVel, dim, road, radius, vehicle_start):
     center, width = road
     obstacles = []
     # x coordinate of the target vehicle
-    target_x = vehicle_start[0]
+    tx, ty, _, _, _, _ = vehicle_start
     
     for _ in range(numVehicle):
         # velocity, acceleration, angle, angular velocity
@@ -54,18 +54,35 @@ def generateObstacle(numVehicle, maxVel, dim, road, radius, vehicle_start):
         w = 0
 
         # x,y position
+        screen_width, screen_height = dim[0], dim[1]
         alpha = random.randint(0,1)
+        center = dim[0] // 2
+
         if alpha == 0:
-            x = random.randint(0, target_x-radius)
+            x_min = 0
+            x_max = tx - 2 * radius
+            x = random.randint(max(x_min, 0), min(x_max, screen_width - radius))
+            y_min = ty + radius
+            y_max = center + width // 2 - radius
+            y = random.randint(max(y_min, 0), min(y_max, screen_height - radius))
+            if y >= dim[0]: 
+                y = dim[0] - radius
         else:
-            x = random.randint(target_x+radius, dim[0])
-        y = center + width//2 - radius if alpha == 0 else center - width//2 + radius
+            x_min = tx + 2 * radius
+            x_max = screen_width
+            x = random.randint(max(x_min, 0), min(x_max, screen_width - radius))
+            y_min = ty - radius
+            y_max = center - width // 2 + radius
+            y = random.randint(max(y_min, 0), min(y_max, screen_height - radius))
+            if y <= radius:
+                y = radius
+        # y = center + width//2 - 2*radius if alpha == 0 else center - width//2 + 2*radius
         feature = [x, y, v, theta, w, a]
         obstacles.append(feature)
     return obstacles
 
 if __name__ == "__main__":
-    name = "env4"
+    name = "demo_gen"
     numStep = 50
     maxVel = 25
     radius = 30
